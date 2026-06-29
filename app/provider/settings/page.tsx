@@ -10,35 +10,29 @@ const EMPTY = {
   bank_account_name: '', bank_bsb: '', bank_account_number: '', next_invoice_number: '1001',
 }
 
-// Fields that must be valid numbers if non-empty
-const NUMERIC_FIELDS: Record<string, string> = {
-  admin_percentage: 'Administration Percentage',
-  admin_flat_fee: 'Administration Flat Fee',
-  next_invoice_number: 'Next Invoice Number',
+// Helper — convert a string to a number or null for Supabase numeric columns
+function toNum(val: string): number | null {
+  if (val === '' || val === null || val === undefined) return null
+  const n = Number(val)
+  return isNaN(n) ? null : n
 }
 
-function Field({
-  label, value, onChange, type = 'text',
-  required = false, half = false, placeholder = ''
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  type?: string
-  required?: boolean
-  half?: boolean
-  placeholder?: string
+function toInt(val: string, fallback: number): number {
+  const n = parseInt(val)
+  return isNaN(n) ? fallback : n
+}
+
+function Field({ label, value, onChange, type = 'text', required = false, half = false, placeholder = '' }: {
+  label: string; value: string; onChange: (v: string) => void
+  type?: string; required?: boolean; half?: boolean; placeholder?: string
 }) {
   return (
     <div className={half ? 'col-span-1' : 'col-span-2'}>
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-        {required && <span className="text-red-500 ml-0.5"> *</span>}
+        {label}{required && <span className="text-red-500 ml-0.5"> *</span>}
       </label>
       <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
+        type={type} value={value} placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
         required={required}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -47,21 +41,14 @@ function Field({
   )
 }
 
-function TextArea({
-  label, value, onChange, rows = 3
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  rows?: number
+function TextArea({ label, value, onChange }: {
+  label: string; value: string; onChange: (v: string) => void
 }) {
   return (
     <div className="col-span-2">
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <textarea
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        rows={rows}
+        value={value} onChange={e => onChange(e.target.value)} rows={3}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
       />
     </div>
@@ -85,11 +72,28 @@ export default function SettingsPage() {
         .from('providers').select('*').eq('user_id', user.id).maybeSingle()
       if (provider) {
         setProviderId(provider.id)
+        // Only pull in the text fields we manage — ignore numeric rating fields etc.
         setData({
-          ...EMPTY,
-          ...Object.fromEntries(
-            Object.entries(provider).map(([k, v]) => [k, v == null ? '' : String(v)])
-          )
+          name: provider.name || '',
+          abn: provider.abn || '',
+          address_line1: provider.address_line1 || '',
+          address_line2: provider.address_line2 || '',
+          suburb: provider.suburb || '',
+          state: provider.state || '',
+          postcode: provider.postcode || '',
+          phone: provider.phone || '',
+          fax: provider.fax || '',
+          email: provider.email || '',
+          website: provider.website || '',
+          ceo_details: provider.ceo_details || '',
+          description: provider.description || '',
+          admin_percentage: provider.admin_percentage != null ? String(provider.admin_percentage) : '',
+          admin_flat_fee: provider.admin_flat_fee != null ? String(provider.admin_flat_fee) : '',
+          emergency_procedures: provider.emergency_procedures || '',
+          bank_account_name: provider.bank_account_name || '',
+          bank_bsb: provider.bank_bsb || '',
+          bank_account_number: provider.bank_account_number || '',
+          next_invoice_number: provider.next_invoice_number != null ? String(provider.next_invoice_number) : '1001',
         })
       }
       setLoading(false)
@@ -101,34 +105,39 @@ export default function SettingsPage() {
     setData(prev => ({ ...prev, [field]: value }))
   }, [])
 
-  function validate(): string {
-    // Check numeric fields
-    for (const [field, label] of Object.entries(NUMERIC_FIELDS)) {
-      const val = data[field]
-      if (val !== '' && isNaN(Number(val))) {
-        return `"${label}" must be a number (you entered: "${val}")`
-      }
-    }
-    return ''
-  }
-
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-
-    const validationError = validate()
-    if (validationError) { setError(validationError); return }
-
     setSaving(true)
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Not logged in'); setSaving(false); return }
 
+    // Build payload with ONLY the fields this form manages,
+    // converting numeric fields explicitly — never passing empty strings
     const payload = {
-      ...data,
       user_id: user.id,
-      admin_percentage: data.admin_percentage === '' ? null : Number(data.admin_percentage),
-      admin_flat_fee: data.admin_flat_fee === '' ? null : Number(data.admin_flat_fee),
-      next_invoice_number: data.next_invoice_number === '' ? 1001 : parseInt(data.next_invoice_number),
+      name: data.name,
+      abn: data.abn,
+      address_line1: data.address_line1,
+      address_line2: data.address_line2 || null,
+      suburb: data.suburb,
+      state: data.state,
+      postcode: data.postcode,
+      phone: data.phone,
+      fax: data.fax || null,
+      email: data.email,
+      website: data.website || null,
+      ceo_details: data.ceo_details || null,
+      description: data.description || null,
+      emergency_procedures: data.emergency_procedures || null,
+      bank_account_name: data.bank_account_name || null,
+      bank_bsb: data.bank_bsb || null,
+      bank_account_number: data.bank_account_number || null,
+      // Numeric fields — always null if empty, never empty string
+      admin_percentage: toNum(data.admin_percentage),
+      admin_flat_fee: toNum(data.admin_flat_fee),
+      next_invoice_number: toInt(data.next_invoice_number, 1001),
     }
 
     if (providerId) {
@@ -157,9 +166,7 @@ export default function SettingsPage() {
     <div className="p-8 max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Provider Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Manage your organisation details and billing information
-        </p>
+        <p className="text-gray-500 text-sm mt-1">Manage your organisation details and billing information</p>
         <p className="text-xs text-gray-400 mt-1">Fields marked <span className="text-red-500">*</span> are required</p>
       </div>
 
