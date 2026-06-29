@@ -250,3 +250,19 @@ create policy "Auth users read carers" on carers
 
 create policy "Auth users read activities" on activities
   for all using (auth.role() = 'authenticated');
+
+-- -------------------------------------------------------
+-- FIX: Provider RLS policies (run if settings won't save)
+-- -------------------------------------------------------
+
+-- Drop existing policy and recreate with full permissions
+drop policy if exists "Providers manage own data" on providers;
+
+create policy "Providers insert own data" on providers
+  for insert with check (auth.uid() = user_id);
+
+create policy "Providers select own data" on providers
+  for select using (auth.uid() = user_id);
+
+create policy "Providers update own data" on providers
+  for update using (auth.uid() = user_id);
