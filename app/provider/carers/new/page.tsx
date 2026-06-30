@@ -23,8 +23,8 @@ export default function NewCarerPage() {
   }, [])
 
   const f = (field: string) => ({
-    defaultValue: data[field] ?? '',
-    onBlur: (v: string) => updateField(field, v),
+    value: data[field] ?? '',
+    onChange: (v: string) => updateField(field, v),
   })
 
   async function handleSave(e: React.FormEvent) {

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
-import { Field, TextArea, Section, ReadOnlyField, SaveBar } from '@/components/FormFields'
+import { Field, TextArea, Section, SaveBar } from '@/components/FormFields'
 import { ArrowLeft, ToggleLeft, ToggleRight } from 'lucide-react'
 import Link from 'next/link'
 
@@ -18,6 +18,7 @@ export default function ClientDetailPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [nominees, setNominees] = useState<any[]>([])
   const router = useRouter()
   const params = useParams()
@@ -45,30 +46,33 @@ export default function ClientDetailPage() {
     load()
   }, [id])
 
-  const updateField = useCallback((field: string, value: string) => {
+  const set = useCallback((field: string, value: string) => {
     setData(prev => ({ ...prev, [field]: value }))
   }, [])
 
   const f = (field: string) => ({
-    defaultValue: data[field] ?? '',
-    onBlur: (v: string) => updateField(field, v),
+    value: data[field] ?? '',
+    onChange: (v: string) => set(field, v),
   })
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    setError('')
     setSaving(true)
     if (isNew) {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: provider } = await supabase
         .from('providers').select('id').eq('user_id', user!.id).single()
-      const { data: created } = await supabase
+      const { data: created, error: err } = await supabase
         .from('clients')
         .insert({ ...data, active, provider_id: provider?.id })
         .select().single()
+      if (err) { setError(err.message); setSaving(false); return }
       setSaving(false)
       if (created) router.push(`/provider/clients/${created.id}`)
     } else {
-      await supabase.from('clients').update({ ...data, active }).eq('id', id)
+      const { error: err } = await supabase.from('clients').update({ ...data, active }).eq('id', id)
+      if (err) { setError(err.message); setSaving(false); return }
       setSaving(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
@@ -152,6 +156,10 @@ export default function ClientDetailPage() {
               </button>
             </div>
           </Section>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">⚠ {error}</div>
         )}
 
         <SaveBar saving={saving} saved={saved} onCancel={() => router.push('/provider/clients')} />
