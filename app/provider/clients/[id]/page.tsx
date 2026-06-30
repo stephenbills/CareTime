@@ -12,6 +12,8 @@ const EMPTY = {
   ndis_number: '', comments: '',
 }
 
+const EDITABLE_FIELDS = Object.keys(EMPTY)
+
 export default function ClientDetailPage() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [active, setActive] = useState(true)
@@ -31,9 +33,13 @@ export default function ClientDetailPage() {
     async function load() {
       const { data: client } = await supabase.from('clients').select('*').eq('id', id).single()
       if (client) {
-        setData({ ...EMPTY, ...Object.fromEntries(
-          Object.entries(client).map(([k, v]) => [k, v == null ? '' : String(v)])
-        )})
+        // Only pull in the text fields this form manages — never system/relation columns.
+        const next: Record<string, string> = { ...EMPTY }
+        for (const key of EDITABLE_FIELDS) {
+          const v = (client as any)[key]
+          next[key] = v == null ? '' : String(v)
+        }
+        setData(next)
         setActive(client.active ?? true)
       }
       const { data: noms } = await supabase
@@ -55,23 +61,42 @@ export default function ClientDetailPage() {
     onChange: (v: string) => set(field, v),
   })
 
+  function buildPayload() {
+    return {
+      name: data.name,
+      email: data.email || null,
+      phone: data.phone || null,
+      mobile: data.mobile || null,
+      address_line1: data.address_line1 || null,
+      address_line2: data.address_line2 || null,
+      suburb: data.suburb || null,
+      state: data.state || null,
+      postcode: data.postcode || null,
+      ndis_number: data.ndis_number || null,
+      comments: data.comments || null,
+      active,
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setSaving(true)
+    const payload = buildPayload()
+
     if (isNew) {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: provider } = await supabase
         .from('providers').select('id').eq('user_id', user!.id).single()
       const { data: created, error: err } = await supabase
         .from('clients')
-        .insert({ ...data, active, provider_id: provider?.id })
+        .insert({ ...payload, provider_id: provider?.id })
         .select().single()
       if (err) { setError(err.message); setSaving(false); return }
       setSaving(false)
       if (created) router.push(`/provider/clients/${created.id}`)
     } else {
-      const { error: err } = await supabase.from('clients').update({ ...data, active }).eq('id', id)
+      const { error: err } = await supabase.from('clients').update(payload).eq('id', id)
       if (err) { setError(err.message); setSaving(false); return }
       setSaving(false)
       setSaved(true)

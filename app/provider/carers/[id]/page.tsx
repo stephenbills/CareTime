@@ -12,6 +12,11 @@ const EMPTY = {
   car_registration: '', abn: '', bank_bsb: '', bank_account_number: '', comments: '',
 }
 
+// Only these text fields are ever written back to the database from this form.
+// Numeric columns (client_rating, provider_rating) and system columns (id, created_at,
+// user_id, etc.) are intentionally excluded so we never send "" into a numeric column.
+const EDITABLE_FIELDS = Object.keys(EMPTY)
+
 function StarRating({ value }: { value: number | null }) {
   if (!value) return <span className="text-gray-400 text-sm">No ratings yet</span>
   return (
@@ -43,9 +48,14 @@ export default function CarerDetailPage() {
     async function load() {
       const { data: carer } = await supabase.from('carers').select('*').eq('id', id).single()
       if (carer) {
-        setData({ ...EMPTY, ...Object.fromEntries(
-          Object.entries(carer).map(([k, v]) => [k, v == null ? '' : String(v)])
-        )})
+        // Only pull in the text fields this form manages — never the numeric rating
+        // columns or system columns, so they can never be accidentally written back.
+        const next: Record<string, string> = { ...EMPTY }
+        for (const key of EDITABLE_FIELDS) {
+          const v = (carer as any)[key]
+          next[key] = v == null ? '' : String(v)
+        }
+        setData(next)
         setActive(carer.active ?? true)
         setRatings({ client: carer.client_rating, provider: carer.provider_rating })
       }
@@ -63,20 +73,43 @@ export default function CarerDetailPage() {
     onChange: (v: string) => set(field, v),
   })
 
+  function buildPayload() {
+    // Explicit field list — never spread raw `data` into a Supabase call.
+    return {
+      name: data.name,
+      email: data.email || null,
+      mobile: data.mobile || null,
+      home_phone: data.home_phone || null,
+      work_phone: data.work_phone || null,
+      address_line1: data.address_line1 || null,
+      suburb: data.suburb || null,
+      state: data.state || null,
+      postcode: data.postcode || null,
+      car_registration: data.car_registration || null,
+      abn: data.abn || null,
+      bank_bsb: data.bank_bsb || null,
+      bank_account_number: data.bank_account_number || null,
+      comments: data.comments || null,
+      active,
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setSaving(true)
+    const payload = buildPayload()
+
     if (isNew) {
       const { data: created, error: err } = await supabase
         .from('carers')
-        .insert({ ...data, active })
+        .insert(payload)
         .select().single()
       if (err) { setError(err.message); setSaving(false); return }
       setSaving(false)
       if (created) router.push(`/provider/carers/${created.id}`)
     } else {
-      const { error: err } = await supabase.from('carers').update({ ...data, active }).eq('id', id)
+      const { error: err } = await supabase.from('carers').update(payload).eq('id', id)
       if (err) { setError(err.message); setSaving(false); return }
       setSaving(false)
       setSaved(true)
