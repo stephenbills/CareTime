@@ -266,3 +266,51 @@ create policy "Providers select own data" on providers
 
 create policy "Providers update own data" on providers
   for update using (auth.uid() = user_id);
+
+-- -------------------------------------------------------
+-- MASTER NDIS CATALOGUE + ADMINISTRATOR ROLE
+-- Run this migration after the original schema
+-- -------------------------------------------------------
+
+-- Master NDIS catalogue maintained by Administrators only
+create table if not exists ndis_master_items (
+  id uuid primary key default uuid_generate_v4(),
+  line_item_number text not null unique,
+  description text not null,
+  support_category text,
+  unit_price numeric(10,2) not null,
+  active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Administrators table
+create table if not exists administrators (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade,
+  name text not null,
+  email text not null,
+  created_at timestamptz default now()
+);
+
+-- Provider's selected NDIS items now reference the master list
+-- Add a link to the master item; provider can still override description/price if needed
+alter table ndis_line_items
+  add column if not exists master_item_id uuid references ndis_master_items(id) on delete set null;
+
+-- RLS for new tables
+alter table ndis_master_items enable row level security;
+alter table administrators enable row level security;
+
+-- Anyone authenticated can read the master list (needed for Providers to browse it)
+create policy "Auth users read master ndis items" on ndis_master_items
+  for select using (auth.role() = 'authenticated');
+
+-- Only administrators can insert/update/delete master items
+-- (enforced at the application layer via the admin PIN gate;
+--  for stronger protection, restrict via a server-side service role key in production)
+create policy "Auth users manage master ndis items" on ndis_master_items
+  for all using (auth.role() = 'authenticated');
+
+create policy "Administrators manage own record" on administrators
+  for all using (auth.uid() = user_id);

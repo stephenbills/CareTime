@@ -1,9 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Users, UserCheck, Building2, RefreshCw, Mail } from 'lucide-react'
+import { Plus, Users, UserCheck, Building2, RefreshCw, Mail, ShieldCheck, ClipboardList } from 'lucide-react'
+import Link from 'next/link'
 
-const ROLES = ['provider', 'carer', 'client', 'nominee']
+const ROLES = ['provider', 'carer', 'client', 'nominee', 'administrator']
 
 type UserRecord = {
   id: string
@@ -43,17 +44,18 @@ export default function AdminPage() {
 
   async function loadUsers() {
     setLoading(true)
-    // Load from our app tables
-    const [{ data: providers }, { data: carers }, { data: clients }] = await Promise.all([
+    const [{ data: providers }, { data: carers }, { data: clients }, { data: admins }] = await Promise.all([
       supabase.from('providers').select('id, name, email, created_at, user_id'),
       supabase.from('carers').select('id, name, email, created_at, user_id'),
       supabase.from('clients').select('id, name, email, created_at'),
+      supabase.from('administrators').select('id, name, email, created_at, user_id'),
     ])
 
     const combined: UserRecord[] = [
       ...(providers || []).map((p: any) => ({ id: p.user_id || p.id, email: p.email || '', role: 'provider', name: p.name || '', created_at: p.created_at, last_sign_in: null })),
       ...(carers || []).map((c: any) => ({ id: c.user_id || c.id, email: c.email || '', role: 'carer', name: c.name || '', created_at: c.created_at, last_sign_in: null })),
       ...(clients || []).map((c: any) => ({ id: c.id, email: c.email || '', role: 'client', name: c.name || '', created_at: c.created_at, last_sign_in: null })),
+      ...(admins || []).map((a: any) => ({ id: a.user_id || a.id, email: a.email || '', role: 'administrator', name: a.name || '', created_at: a.created_at, last_sign_in: null })),
     ]
     setUsers(combined)
     setLoading(false)
@@ -98,6 +100,10 @@ export default function AdminPage() {
         await supabase.from('nominees').insert({
           user_id: userId, name: form.name, email: form.email.trim()
         })
+      } else if (form.role === 'administrator') {
+        await supabase.from('administrators').insert({
+          user_id: userId, name: form.name, email: form.email.trim()
+        })
       }
     }
 
@@ -109,13 +115,14 @@ export default function AdminPage() {
   }
 
   const roleIcon: Record<string, any> = {
-    provider: Building2, carer: UserCheck, client: Users, nominee: Users
+    provider: Building2, carer: UserCheck, client: Users, nominee: Users, administrator: ShieldCheck
   }
   const roleColor: Record<string, string> = {
     provider: 'bg-blue-100 text-blue-700',
     carer: 'bg-green-100 text-green-700',
     client: 'bg-purple-100 text-purple-700',
     nominee: 'bg-orange-100 text-orange-700',
+    administrator: 'bg-gray-900 text-white',
   }
 
   if (!authed) {
@@ -149,6 +156,7 @@ export default function AdminPage() {
     carer: users.filter(u => u.role === 'carer').length,
     client: users.filter(u => u.role === 'client').length,
     nominee: users.filter(u => u.role === 'nominee').length,
+    administrator: users.filter(u => u.role === 'administrator').length,
   }
 
   return (
@@ -160,6 +168,10 @@ export default function AdminPage() {
             <p className="text-gray-500 text-sm mt-1">Manage user accounts across all roles</p>
           </div>
           <div className="flex gap-2">
+            <Link href="/admin/ndis-master"
+              className="flex items-center gap-1.5 border border-gray-200 bg-white px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+              <ClipboardList size={14} /> NDIS Master Catalogue
+            </Link>
             <button onClick={loadUsers}
               className="flex items-center gap-1.5 border border-gray-200 bg-white px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
               <RefreshCw size={14} /> Refresh
@@ -172,8 +184,8 @@ export default function AdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          {(['provider','carer','client','nominee'] as const).map(role => {
+        <div className="grid grid-cols-5 gap-4 mb-8">
+          {(['provider','carer','client','nominee','administrator'] as const).map(role => {
             const Icon = roleIcon[role]
             return (
               <div key={role} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
