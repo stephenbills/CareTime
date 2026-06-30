@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Users, UserCheck, Building2, RefreshCw, Mail, ShieldCheck, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
+import { notify } from '@/lib/email/notify'
 
 const ROLES = ['provider', 'carer', 'client', 'nominee', 'administrator']
 
@@ -108,6 +109,11 @@ export default function AdminPage() {
     }
 
     setSaving(false)
+    notify('welcome', form.email.trim(), {
+      name: form.name,
+      role: form.role,
+      loginUrl: `${window.location.origin}/auth/login`,
+    })
     setSuccess(`✓ Created ${form.role} account for ${form.email}. They can now log in.`)
     setForm({ email: '', name: '', role: 'provider', password: '' })
     setShowForm(false)

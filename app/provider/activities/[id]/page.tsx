@@ -5,12 +5,14 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { Section, SaveBar } from '@/components/FormFields'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { notify } from '@/lib/email/notify'
 
 const EMPTY = {
   title: '', description: '', status: 'awaiting_acceptance',
   start_time: '', end_time: '',
   pickup_address: '', dropoff_address: '', venue_address: '',
   client_id: '', carer_id: '', ndis_line_item_id: '',
+  client_comments: '', rejection_reason: '',
 }
 
 function Field({ label, value, onChange, type = 'text', required = false, half = false, placeholder = '' }: {
@@ -87,6 +89,12 @@ function toLocalDateTimeInput(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString('en-AU', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
+  })
+}
+
 export default function ActivityPage() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [saving, setSaving] = useState(false)
@@ -106,8 +114,8 @@ export default function ActivityPage() {
   useEffect(() => {
     async function load() {
       const [{ data: cls }, { data: crs }, { data: ndis }] = await Promise.all([
-        supabase.from('clients').select('id, name').eq('active', true).order('name'),
-        supabase.from('carers').select('id, name').eq('active', true).order('name'),
+        supabase.from('clients').select('id, name, email').eq('active', true).order('name'),
+        supabase.from('carers').select('id, name, email').eq('active', true).order('name'),
         supabase.from('ndis_line_items').select('id, line_item_number, description').eq('active', true),
       ])
       setClients(cls || [])
@@ -125,14 +133,9 @@ export default function ActivityPage() {
           })
         }
       } else {
-        // Pre-fill date from query param if coming from calendar
         const date = searchParams?.get('date')
         if (date) {
-          setData(d => ({
-            ...d,
-            start_time: `${date}T09:00`,
-            end_time: `${date}T11:00`,
-          }))
+          setData(d => ({ ...d, start_time: `${date}T09:00`, end_time: `${date}T11:00` }))
         }
       }
       setLoading(false)
@@ -179,12 +182,14 @@ export default function ActivityPage() {
       provider_id: provider?.id || null,
     }
 
+    const selectedClient = clients.find(c => c.id === data.client_id)
+    const selectedCarer = carers.find(c => c.id === data.carer_id)
+
     if (isNew) {
       const { data: created, error: err } = await supabase
         .from('activities').insert(payload).select().single()
       if (err) { setError(err.message); setSaving(false); return }
 
-      // Log status history
       if (created) {
         await supabase.from('activity_status_history').insert({
           activity_id: created.id,
@@ -192,7 +197,19 @@ export default function ActivityPage() {
           to_status: payload.status,
           changed_by: user!.id,
         })
-        router.push(`/provider/activities/${created.id}`)
+
+        if (selectedCarer?.email) {
+          notify('activity_assigned', selectedCarer.email, {
+            carerName: selectedCarer.name,
+            activityTitle: payload.title,
+            clientName: selectedClient?.name || '—',
+            startTime: formatDateTime(payload.start_time),
+            endTime: formatDateTime(payload.end_time),
+            activityId: created.id,
+          })
+        }
+
+        router.push('/provider/calendar')
       }
     } else {
       const { data: existing } = await supabase
@@ -200,15 +217,68 @@ export default function ActivityPage() {
       const { error: err } = await supabase.from('activities').update(payload).eq('id', id)
       if (err) { setError(err.message); setSaving(false); return }
 
-      // Log status change if status changed
-      if (existing && existing.status !== payload.status) {
+      const statusChanged = existing && existing.status !== payload.status
+
+      if (statusChanged) {
         await supabase.from('activity_status_history').insert({
           activity_id: id,
-          from_status: existing.status,
+          from_status: existing!.status,
           to_status: payload.status,
           changed_by: user!.id,
         })
+
+        if (payload.status === 'scheduled' && selectedClient?.email) {
+          notify('activity_accepted', selectedClient.email, {
+            recipientName: selectedClient.name,
+            carerName: selectedCarer?.name || 'The carer',
+            activityTitle: payload.title,
+            activityId: id,
+          })
+        }
+        if (payload.status === 'awaiting_client_approval' && selectedClient?.email) {
+          notify('shift_submitted', selectedClient.email, {
+            recipientName: selectedClient.name,
+            carerName: selectedCarer?.name || 'The carer',
+            activityTitle: payload.title,
+            startTime: formatDateTime(payload.start_time),
+            endTime: formatDateTime(payload.end_time),
+            totalCost: 'See activity for details',
+            activityId: id,
+          })
+        }
+        if (payload.status === 'awaiting_payment_approval' && selectedCarer?.email) {
+          notify('shift_approved', selectedCarer.email, {
+            recipientName: selectedCarer.name,
+            clientName: selectedClient?.name || 'The client',
+            activityTitle: payload.title,
+            activityId: id,
+          })
+        }
+        if (payload.status === 'ready_for_payment' && selectedCarer?.email) {
+          notify('payment_approved', selectedCarer.email, {
+            carerName: selectedCarer.name,
+            activityTitle: payload.title,
+            activityId: id,
+          })
+        }
+        if (payload.status === 'rejected' && selectedCarer?.email) {
+          notify('shift_rejected', selectedCarer.email, {
+            recipientName: selectedCarer.name,
+            clientName: selectedClient?.name || 'The client',
+            activityTitle: payload.title,
+            rejectionReason: data.client_comments || data.rejection_reason || '',
+            activityId: id,
+          })
+        }
+      } else if (selectedCarer?.email) {
+        notify('activity_changed', selectedCarer.email, {
+          recipientName: selectedCarer.name,
+          activityTitle: payload.title,
+          changedBy: 'the Provider',
+          activityId: id,
+        })
       }
+
       setSaving(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
@@ -273,6 +343,13 @@ export default function ActivityPage() {
               onChange={v => set('venue_address', v)} placeholder="Optional — only if activity is at a separate location" />
           </div>
         </Section>
+
+        {data.status === 'rejected' && (
+          <Section title="Rejection Details">
+            <TextArea label="Rejection Reason" value={data.client_comments}
+              onChange={v => set('client_comments', v)} placeholder="Why was this shift rejected?" />
+          </Section>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
