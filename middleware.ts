@@ -23,7 +23,6 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Public paths — no auth required
   const publicPaths = ['/auth/login', '/auth/callback', '/admin']
   const isPublic = publicPaths.some(p => request.nextUrl.pathname.startsWith(p))
 

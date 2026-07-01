@@ -92,7 +92,7 @@ export function activityAssignedEmail(opts: {
       detailRow('Start', opts.startTime) +
       detailRow('End', opts.endTime)
     )}
-    ${button('View Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `New activity assigned: ${opts.activityTitle}`, html: wrapper(content, 'You have a new activity to review') }
 }
@@ -103,7 +103,7 @@ export function activityAcceptedEmail(opts: {
   const content = `
     ${heading('Activity Accepted')}
     ${paragraph(`Hi ${opts.recipientName}, ${opts.carerName} has accepted the activity "${opts.activityTitle}".`)}
-    ${button('View Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Activity accepted: ${opts.activityTitle}`, html: wrapper(content) }
 }
@@ -114,7 +114,7 @@ export function activityDeclinedEmail(opts: {
   const content = `
     ${heading('Activity Declined')}
     ${paragraph(`Hi ${opts.recipientName}, ${opts.carerName} has declined the activity "${opts.activityTitle}". Please reassign a Carer.`)}
-    ${button('Reassign Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('Reassign Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Activity declined: ${opts.activityTitle}`, html: wrapper(content) }
 }
@@ -130,7 +130,7 @@ export function activityReminderEmail(opts: {
       detailRow('Start', opts.startTime) +
       detailRow('Pickup', opts.pickupAddress || '—')
     )}
-    ${button('View Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Reminder: ${opts.activityTitle} starting soon`, html: wrapper(content) }
 }
@@ -148,7 +148,7 @@ export function shiftSubmittedEmail(opts: {
       detailRow('End', opts.endTime) +
       detailRow('Total Cost', opts.totalCost)
     )}
-    ${button('Review & Approve', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('Review & Approve', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Shift ready for approval: ${opts.activityTitle}`, html: wrapper(content, 'A shift is waiting for your approval') }
 }
@@ -159,7 +159,7 @@ export function shiftApprovedEmail(opts: {
   const content = `
     ${heading('Shift Approved')}
     ${paragraph(`Hi ${opts.recipientName}, ${opts.clientName} has approved the shift "${opts.activityTitle}".`)}
-    ${button('View Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Shift approved: ${opts.activityTitle}`, html: wrapper(content) }
 }
@@ -173,7 +173,7 @@ export function shiftRejectedEmail(opts: {
     ${paragraph(`Hi ${opts.recipientName}, ${opts.clientName} has rejected the shift "${opts.activityTitle}".`)}
     ${detailsTable(detailRow('Reason', opts.rejectionReason || 'No reason provided'))}
     ${paragraph('Please amend or withdraw this shift.')}
-    ${button('Review Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('Review Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Shift rejected: ${opts.activityTitle}`, html: wrapper(content) }
 }
@@ -184,7 +184,7 @@ export function paymentApprovedEmail(opts: {
   const content = `
     ${heading('Payment Approved')}
     ${paragraph(`Hi ${opts.carerName}, your shift "${opts.activityTitle}" has been approved for payment.`)}
-    ${button('View Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Payment approved: ${opts.activityTitle}`, html: wrapper(content) }
 }
@@ -206,7 +206,7 @@ export function activityChangedEmail(opts: {
   const content = `
     ${heading('Activity Updated')}
     ${paragraph(`Hi ${opts.recipientName}, the activity "${opts.activityTitle}" has been updated by ${opts.changedBy}.`)}
-    ${button('View Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Activity updated: ${opts.activityTitle}`, html: wrapper(content) }
 }
@@ -217,7 +217,7 @@ export function carerReallocatedEmail(opts: {
   const content = `
     ${heading('Carer Reassigned')}
     ${paragraph(`Hi ${opts.recipientName}, the activity "${opts.activityTitle}" has been reassigned to ${opts.newCarerName}.`)}
-    ${button('View Activity', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `Carer reassigned: ${opts.activityTitle}`, html: wrapper(content) }
 }
@@ -230,7 +230,7 @@ export function eventReportEmail(opts: {
     ${heading('⚠ Event Report Submitted')}
     ${paragraph(`Hi ${opts.recipientName}, an event report has been logged for ${opts.clientName} during "${opts.activityTitle}".`)}
     ${detailsTable(detailRow('Description', opts.description))}
-    ${button('View Full Report', `${APP_URL}/provider/activities/${opts.activityId}`)}
+    ${button('View Full Report', `${APP_URL}/carer/activities/${opts.activityId}`)}
   `
   return { subject: `⚠ Event report: ${opts.activityTitle}`, html: wrapper(content, 'An event report requires your attention') }
 }
