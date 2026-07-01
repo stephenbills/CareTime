@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { type, to, data } = body
 
+    console.log('[/api/notify] Received:', type, 'to:', to)
+
     if (!type || !to) {
       return NextResponse.json({ error: 'Missing type or recipient' }, { status: 400 })
     }
@@ -37,11 +39,14 @@ export async function POST(req: NextRequest) {
     }
 
     const { subject, html } = templateFn(data || {})
+    console.log('[/api/notify] Sending:', subject, 'to:', to)
+
     const result = await sendEmail({ to, subject, html })
+    console.log('[/api/notify] Result:', JSON.stringify(result))
 
     return NextResponse.json({ success: true, result })
   } catch (err: any) {
-    console.error('Notification send error:', err)
+    console.error('[/api/notify] Error:', err.message)
     return NextResponse.json({ error: err.message || 'Failed to send notification' }, { status: 500 })
   }
 }
