@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import { Field, TextArea, Section, SaveBar } from '@/components/FormFields'
-import { ArrowLeft, ToggleLeft, ToggleRight } from 'lucide-react'
+import { ArrowLeft, ToggleLeft, ToggleRight, Mail } from 'lucide-react'
 import Link from 'next/link'
 
 const EMPTY = {
@@ -17,10 +17,13 @@ const EDITABLE_FIELDS = Object.keys(EMPTY)
 export default function ClientDetailPage() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [active, setActive] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState('')
   const [nominees, setNominees] = useState<any[]>([])
   const router = useRouter()
   const params = useParams()
@@ -41,6 +44,7 @@ export default function ClientDetailPage() {
         }
         setData(next)
         setActive(client.active ?? true)
+        setUserId(client.user_id || null)
       }
       const { data: noms } = await supabase
         .from('client_nominees')
@@ -117,6 +121,31 @@ export default function ClientDetailPage() {
     }
   }
 
+  async function handleInvite() {
+    if (!data.email) { setError('Email address is required to send an invitation'); return }
+    setInviting(true)
+    setInviteMsg('')
+    setError('')
+
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, name: data.name, role: 'client', recordId: id }),
+    })
+    const result = await res.json()
+
+    if (!res.ok) {
+      setError(result.error || 'Failed to send invitation')
+    } else {
+      setInviteMsg(`Invitation sent to ${data.email}`)
+      const { data: updated } = await supabase
+        .from('clients').select('user_id').eq('id', id).single()
+      if (updated?.user_id) setUserId(updated.user_id)
+      setTimeout(() => setInviteMsg(''), 4000)
+    }
+    setInviting(false)
+  }
+
   if (loading) return <div className="p-8 text-gray-400 text-sm">Loading…</div>
 
   return (
@@ -169,6 +198,35 @@ export default function ClientDetailPage() {
                 </li>
               ))}
             </ul>
+          </Section>
+        )}
+
+        {!isNew && (
+          <Section title="App Access">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {userId ? 'Invited' : 'Not yet invited'}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {userId
+                    ? 'This client has a login account. Resend invite if they need a new link.'
+                    : 'Send an invitation so this client can log in to CareTime.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleInvite}
+                disabled={inviting || !data.email}
+                className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                <Mail size={14} />
+                {inviting ? 'Sending…' : userId ? 'Resend Invite' : 'Send Invite'}
+              </button>
+            </div>
+            {inviteMsg && (
+              <p className="text-green-600 text-sm mt-2">✓ {inviteMsg}</p>
+            )}
           </Section>
         )}
 

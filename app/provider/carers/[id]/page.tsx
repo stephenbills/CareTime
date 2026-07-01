@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import { Field, TextArea, Section, SaveBar } from '@/components/FormFields'
-import { ArrowLeft, ToggleLeft, ToggleRight, Star } from 'lucide-react'
+import { ArrowLeft, ToggleLeft, ToggleRight, Star, Mail } from 'lucide-react'
 import Link from 'next/link'
 
 const EMPTY = {
@@ -12,9 +12,6 @@ const EMPTY = {
   car_registration: '', abn: '', bank_bsb: '', bank_account_number: '', comments: '',
 }
 
-// Only these text fields are ever written back to the database from this form.
-// Numeric columns (client_rating, provider_rating) and system columns (id, created_at,
-// user_id, etc.) are intentionally excluded so we never send "" into a numeric column.
 const EDITABLE_FIELDS = Object.keys(EMPTY)
 
 function StarRating({ value }: { value: number | null }) {
@@ -32,11 +29,14 @@ function StarRating({ value }: { value: number | null }) {
 export default function CarerDetailPage() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [active, setActive] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
   const [ratings, setRatings] = useState({ client: null as number | null, provider: null as number | null })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState('')
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -48,8 +48,6 @@ export default function CarerDetailPage() {
     async function load() {
       const { data: carer } = await supabase.from('carers').select('*').eq('id', id).single()
       if (carer) {
-        // Only pull in the text fields this form manages — never the numeric rating
-        // columns or system columns, so they can never be accidentally written back.
         const next: Record<string, string> = { ...EMPTY }
         for (const key of EDITABLE_FIELDS) {
           const v = (carer as any)[key]
@@ -57,6 +55,7 @@ export default function CarerDetailPage() {
         }
         setData(next)
         setActive(carer.active ?? true)
+        setUserId(carer.user_id || null)
         setRatings({ client: carer.client_rating, provider: carer.provider_rating })
       }
       setLoading(false)
@@ -74,7 +73,6 @@ export default function CarerDetailPage() {
   })
 
   function buildPayload() {
-    // Explicit field list — never spread raw `data` into a Supabase call.
     return {
       name: data.name,
       email: data.email || null,
@@ -102,17 +100,13 @@ export default function CarerDetailPage() {
 
     if (isNew) {
       const { data: created, error: err } = await supabase
-        .from('carers')
-        .insert(payload)
-        .select().single()
+        .from('carers').insert(payload).select().single()
       if (err) { setError(err.message); setSaving(false); return }
       setSaving(false)
       if (created) router.push(`/provider/carers/${created.id}`)
     } else {
-      // Check if email changed — if so, update Supabase auth too
       const { data: existing } = await supabase
         .from('carers').select('email, user_id').eq('id', id).single()
-
       const { error: err } = await supabase.from('carers').update(payload).eq('id', id)
       if (err) { setError(err.message); setSaving(false); return }
 
@@ -128,6 +122,32 @@ export default function CarerDetailPage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     }
+  }
+
+  async function handleInvite() {
+    if (!data.email) { setError('Email address is required to send an invitation'); return }
+    setInviting(true)
+    setInviteMsg('')
+    setError('')
+
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, name: data.name, role: 'carer', recordId: id }),
+    })
+    const result = await res.json()
+
+    if (!res.ok) {
+      setError(result.error || 'Failed to send invitation')
+    } else {
+      setInviteMsg(`Invitation sent to ${data.email}`)
+      // Reload to pick up the new user_id if it was just linked
+      const { data: updated } = await supabase
+        .from('carers').select('user_id').eq('id', id).single()
+      if (updated?.user_id) setUserId(updated.user_id)
+      setTimeout(() => setInviteMsg(''), 4000)
+    }
+    setInviting(false)
   }
 
   if (loading) return <div className="p-8 text-gray-400 text-sm">Loading…</div>
@@ -195,6 +215,35 @@ export default function CarerDetailPage() {
         )}
 
         {!isNew && (
+          <Section title="App Access">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {userId ? 'Invited' : 'Not yet invited'}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {userId
+                    ? 'This carer has a login account. Resend invite if they need a new link.'
+                    : 'Send an invitation so this carer can log in to CareTime.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleInvite}
+                disabled={inviting || !data.email}
+                className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                <Mail size={14} />
+                {inviting ? 'Sending…' : userId ? 'Resend Invite' : 'Send Invite'}
+              </button>
+            </div>
+            {inviteMsg && (
+              <p className="text-green-600 text-sm mt-2">✓ {inviteMsg}</p>
+            )}
+          </Section>
+        )}
+
+        {!isNew && (
           <Section title="Account Status">
             <div className="flex items-center justify-between">
               <div>
@@ -203,7 +252,8 @@ export default function CarerDetailPage() {
                   {active ? 'Carer can be assigned to activities' : 'Carer is deactivated and hidden from active lists'}
                 </p>
               </div>
-              <button type="button" onClick={() => setActive(a => !a)} className="text-gray-400 hover:text-blue-600 transition-colors">
+              <button type="button" onClick={() => setActive(a => !a)}
+                className="text-gray-400 hover:text-blue-600 transition-colors">
                 {active ? <ToggleRight size={36} className="text-blue-600" /> : <ToggleLeft size={36} />}
               </button>
             </div>
