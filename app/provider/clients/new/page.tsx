@@ -15,30 +15,48 @@ const EMPTY = {
 export default function NewClientPage() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const router = useRouter()
   const supabase = createClient()
 
-  const updateField = useCallback((field: string, value: string) => {
+  const set = useCallback((field: string, value: string) => {
     setData(prev => ({ ...prev, [field]: value }))
   }, [])
 
-  const f = (field: string) => ({
-    value: data[field] ?? '',
-    onChange: (v: string) => updateField(field, v),
-  })
+  const f = (field: string) => ({ value: data[field] ?? '', onChange: (v: string) => set(field, v) })
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    if (!data.email.trim()) { setError('Email is required to send the invitation'); return }
     setSaving(true)
+    setError('')
+
     const { data: { user } } = await supabase.auth.getUser()
     const { data: provider } = await supabase
       .from('providers').select('id').eq('user_id', user!.id).single()
-    const { data: created } = await supabase
-      .from('clients')
-      .insert({ ...data, active: true, provider_id: provider?.id })
-      .select().single()
+
+    const payload = {
+      name: data.name, email: data.email || null, phone: data.phone || null,
+      mobile: data.mobile || null, address_line1: data.address_line1 || null,
+      address_line2: data.address_line2 || null, suburb: data.suburb || null,
+      state: data.state || null, postcode: data.postcode || null,
+      ndis_number: data.ndis_number || null, comments: data.comments || null,
+      active: true, provider_id: provider?.id,
+    }
+
+    const { data: created, error: err } = await supabase
+      .from('clients').insert(payload).select().single()
+    if (err) { setError(err.message); setSaving(false); return }
+
+    // Send invite
+    await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email, name: data.name, role: 'client', recordId: created.id }),
+    })
+
     setSaving(false)
-    if (created) router.push(`/provider/clients/${created.id}`)
+    router.push(`/provider/clients/${created.id}`)
   }
 
   return (
@@ -49,7 +67,9 @@ export default function NewClientPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Add Client</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Enter the new client's details below</p>
+          <p className="text-gray-500 text-sm mt-0.5">
+            An invitation email will be sent to the client to set their password
+          </p>
         </div>
       </div>
 
@@ -74,6 +94,9 @@ export default function NewClientPage() {
             <TextArea label="Comments" {...f('comments')} />
           </div>
         </Section>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">⚠ {error}</div>
+        )}
         <SaveBar saving={saving} saved={false} onCancel={() => router.push('/provider/clients')} />
       </form>
     </div>

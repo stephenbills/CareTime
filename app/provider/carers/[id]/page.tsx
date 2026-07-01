@@ -109,8 +109,21 @@ export default function CarerDetailPage() {
       setSaving(false)
       if (created) router.push(`/provider/carers/${created.id}`)
     } else {
+      // Check if email changed — if so, update Supabase auth too
+      const { data: existing } = await supabase
+        .from('carers').select('email, user_id').eq('id', id).single()
+
       const { error: err } = await supabase.from('carers').update(payload).eq('id', id)
       if (err) { setError(err.message); setSaving(false); return }
+
+      if (existing?.user_id && existing?.email !== data.email && data.email) {
+        await fetch('/api/update-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: existing.user_id, newEmail: data.email }),
+        })
+      }
+
       setSaving(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
