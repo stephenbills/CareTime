@@ -37,13 +37,13 @@ export default function CarerDetails() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: carer } = await supabase
+      const { data: worker } = await supabase
         .from('carers').select('*').eq('user_id', user.id).maybeSingle()
-      if (carer) {
-        setCarerId(carer.id)
+      if (worker) {
+        setCarerId(worker.id)
         const next: Record<string, string> = { ...EMPTY }
         for (const key of Object.keys(EMPTY)) {
-          next[key] = carer[key] == null ? '' : String(carer[key])
+          next[key] = worker[key] == null ? '' : String(worker[key])
         }
         setData(next)
       }

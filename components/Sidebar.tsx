@@ -10,7 +10,7 @@ import {
 const nav = [
   { label: 'Dashboard', href: '/provider/dashboard', icon: LayoutDashboard },
   { label: 'Clients', href: '/provider/clients', icon: Users },
-  { label: 'Carers', href: '/provider/carers', icon: UserCheck },
+  { label: 'Workers', href: '/provider/carers', icon: UserCheck },
   { label: 'Calendar', href: '/provider/calendar', icon: Calendar },
   { label: 'Invoices', href: '/provider/invoices', icon: FileText },
   { label: 'Reports', href: '/provider/reports', icon: BarChart2 },

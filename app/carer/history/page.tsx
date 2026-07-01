@@ -37,13 +37,13 @@ export default function CarerHistory() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: carer } = await supabase
+      const { data: worker } = await supabase
         .from('carers').select('id').eq('user_id', user.id).maybeSingle()
-      if (!carer) { setLoading(false); return }
+      if (!worker) { setLoading(false); return }
 
       const [{ data: acts }, { data: cls }] = await Promise.all([
         supabase.from('activities').select('*')
-          .eq('carer_id', carer.id)
+          .eq('carer_id', worker.id)
           .in('status', ['awaiting_client_approval', 'awaiting_payment_approval', 'ready_for_payment', 'paid', 'rejected', 'cancelled'])
           .order('start_time', { ascending: false }),
         supabase.from('clients').select('id, name'),
@@ -72,7 +72,7 @@ export default function CarerHistory() {
       ) : (
         <div className="space-y-2">
           {activities.map(act => (
-            <Link key={act.id} href={`/carer/activities/${act.id}`}
+            <Link key={act.id} href={`/worker/activities/${act.id}`}
               className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 active:bg-gray-50">
               <div className="flex items-start justify-between gap-2 mb-1.5">
                 <p className="font-semibold text-gray-900 text-sm leading-tight">{act.title}</p>

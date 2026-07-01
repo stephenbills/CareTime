@@ -49,7 +49,7 @@ export default function CalendarPage() {
   const [activities, setActivities] = useState<any[]>([])
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
   const [clients, setClients] = useState<Record<string, string>>({})
-  const [carers, setCarers] = useState<Record<string, string>>({})
+  const [workers, setCarers] = useState<Record<string, string>>({})
   const [filterClient, setFilterClient] = useState('')
   const [filterCarer, setFilterCarer] = useState('')
   const router = useRouter()
@@ -121,8 +121,8 @@ export default function CalendarPage() {
         </select>
         <select value={filterCarer} onChange={e => setFilterCarer(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-          <option value="">All Carers</option>
-          {Object.entries(carers).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          <option value="">All Workers</option>
+          {Object.entries(workers).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </div>
 
@@ -214,7 +214,7 @@ export default function CalendarPage() {
                     {formatTime(a.start_time)} – {formatTime(a.end_time)}
                   </p>
                   {a.client_id && <p className="text-xs text-gray-400 mt-0.5">Client: {clients[a.client_id] || '—'}</p>}
-                  {a.carer_id && <p className="text-xs text-gray-400">Carer: {carers[a.carer_id] || '—'}</p>}
+                  {a.carer_id && <p className="text-xs text-gray-400">Worker: {workers[a.carer_id] || '—'}</p>}
                 </Link>
               ))}
             </div>

@@ -46,17 +46,17 @@ export default function CarerDetailPage() {
   useEffect(() => {
     if (isNew) { setLoading(false); return }
     async function load() {
-      const { data: carer } = await supabase.from('carers').select('*').eq('id', id).single()
-      if (carer) {
+      const { data: worker } = await supabase.from('carers').select('*').eq('id', id).single()
+      if (worker) {
         const next: Record<string, string> = { ...EMPTY }
         for (const key of EDITABLE_FIELDS) {
-          const v = (carer as any)[key]
+          const v = (worker as any)[key]
           next[key] = v == null ? '' : String(v)
         }
         setData(next)
-        setActive(carer.active ?? true)
-        setUserId(carer.user_id || null)
-        setRatings({ client: carer.client_rating, provider: carer.provider_rating })
+        setActive(worker.active ?? true)
+        setUserId(worker.user_id || null)
+        setRatings({ client: worker.client_rating, provider: worker.provider_rating })
       }
       setLoading(false)
     }
@@ -160,10 +160,10 @@ export default function CarerDetailPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isNew ? 'Add Carer' : data.name || 'Carer Details'}
+            {isNew ? 'Add Worker' : data.name || 'Worker Details'}
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {isNew ? 'Enter carer details below' : 'Edit carer information'}
+            {isNew ? 'Enter worker details below' : 'Edit worker information'}
           </p>
         </div>
       </div>
@@ -223,8 +223,8 @@ export default function CarerDetailPage() {
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {userId
-                    ? 'This carer has a login account. Resend invite if they need a new link.'
-                    : 'Send an invitation so this carer can log in to CareTime.'}
+                    ? 'This worker has a login account. Resend invite if they need a new link.'
+                    : 'Send an invitation so this worker can log in to CareTime.'}
                 </p>
               </div>
               <button
@@ -249,7 +249,7 @@ export default function CarerDetailPage() {
               <div>
                 <p className="text-sm font-medium text-gray-900">{active ? 'Active' : 'Inactive'}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {active ? 'Carer can be assigned to activities' : 'Carer is deactivated and hidden from active lists'}
+                  {active ? 'Worker can be assigned to activities' : 'Worker is deactivated and hidden from active lists'}
                 </p>
               </div>
               <button type="button" onClick={() => setActive(a => !a)}

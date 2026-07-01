@@ -114,7 +114,7 @@ export default function ActivityPage() {
   useEffect(() => {
     async function load() {
       const [{ data: cls }, { data: crs }, { data: ndis }] = await Promise.all([
-        supabase.from('clients').select('id, name, email').eq('active', true).order('name'),
+        supabase.from('clients').select('id, name, email, address_line1, suburb, state, postcode').eq('active', true).order('name'),
         supabase.from('carers').select('id, name, email').eq('active', true).order('name'),
         supabase.from('ndis_line_items').select('id, line_item_number, description').eq('active', true),
       ])
@@ -146,6 +146,20 @@ export default function ActivityPage() {
   const set = useCallback((field: string, value: string) => {
     setData(prev => ({ ...prev, [field]: value }))
   }, [])
+
+  // When client changes, default pickup/dropoff to their address
+  function handleClientChange(clientId: string) {
+    set('client_id', clientId)
+    if (clientId && isNew) {
+      const client = clients.find(c => c.id === clientId)
+      if (client?.address_line1) {
+        const addr = [client.address_line1, client.suburb, client.state, client.postcode]
+          .filter(Boolean).join(', ')
+        set('pickup_address', addr)
+        set('dropoff_address', addr)
+      }
+    }
+  }
 
   function validate() {
     if (!data.title.trim()) return 'Activity title is required'
@@ -230,7 +244,7 @@ export default function ActivityPage() {
         if (payload.status === 'scheduled' && selectedClient?.email) {
           notify('activity_accepted', selectedClient.email, {
             recipientName: selectedClient.name,
-            carerName: selectedCarer?.name || 'The carer',
+            carerName: selectedCarer?.name || 'The worker',
             activityTitle: payload.title,
             activityId: id,
           })
@@ -238,7 +252,7 @@ export default function ActivityPage() {
         if (payload.status === 'awaiting_client_approval' && selectedClient?.email) {
           notify('shift_submitted', selectedClient.email, {
             recipientName: selectedClient.name,
-            carerName: selectedCarer?.name || 'The carer',
+            carerName: selectedCarer?.name || 'The worker',
             activityTitle: payload.title,
             startTime: formatDateTime(payload.start_time),
             endTime: formatDateTime(payload.end_time),
@@ -311,9 +325,9 @@ export default function ActivityPage() {
         <Section title="Activity Details">
           <div className="grid grid-cols-2 gap-4">
             <Field label="Activity Title" value={data.title} onChange={v => set('title', v)} required />
-            <Select label="Client" value={data.client_id} onChange={v => set('client_id', v)}
+            <Select label="Client" value={data.client_id} onChange={handleClientChange}
               options={clientOptions} required half />
-            <Select label="Carer (Optional)" value={data.carer_id} onChange={v => set('carer_id', v)}
+            <Select label="Worker (Optional)" value={data.carer_id} onChange={v => set('carer_id', v)}
               options={carerOptions} half />
             <Select label="NDIS Line Item" value={data.ndis_line_item_id}
               onChange={v => set('ndis_line_item_id', v)} options={ndisOptions} />

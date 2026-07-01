@@ -5,7 +5,7 @@ import { Plus, Users, UserCheck, Building2, RefreshCw, Mail, ShieldCheck, Clipbo
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
 
-const ROLES = ['provider', 'carer', 'client', 'nominee', 'administrator']
+const ROLES = ['provider', 'worker', 'client', 'nominee', 'administrator']
 
 type UserRecord = {
   id: string
@@ -45,7 +45,7 @@ export default function AdminPage() {
 
   async function loadUsers() {
     setLoading(true)
-    const [{ data: providers }, { data: carers }, { data: clients }, { data: admins }] = await Promise.all([
+    const [{ data: providers }, { data: workers }, { data: clients }, { data: admins }] = await Promise.all([
       supabase.from('providers').select('id, name, email, created_at, user_id'),
       supabase.from('carers').select('id, name, email, created_at, user_id'),
       supabase.from('clients').select('id, name, email, created_at'),
@@ -54,7 +54,7 @@ export default function AdminPage() {
 
     const combined: UserRecord[] = [
       ...(providers || []).map((p: any) => ({ id: p.user_id || p.id, email: p.email || '', role: 'provider', name: p.name || '', created_at: p.created_at, last_sign_in: null })),
-      ...(carers || []).map((c: any) => ({ id: c.user_id || c.id, email: c.email || '', role: 'carer', name: c.name || '', created_at: c.created_at, last_sign_in: null })),
+      ...(workers || []).map((c: any) => ({ id: c.user_id || c.id, email: c.email || '', role: 'carer', name: c.name || '', created_at: c.created_at, last_sign_in: null })),
       ...(clients || []).map((c: any) => ({ id: c.id, email: c.email || '', role: 'client', name: c.name || '', created_at: c.created_at, last_sign_in: null })),
       ...(admins || []).map((a: any) => ({ id: a.user_id || a.id, email: a.email || '', role: 'administrator', name: a.name || '', created_at: a.created_at, last_sign_in: null })),
     ]
@@ -121,11 +121,11 @@ export default function AdminPage() {
   }
 
   const roleIcon: Record<string, any> = {
-    provider: Building2, carer: UserCheck, client: Users, nominee: Users, administrator: ShieldCheck
+    provider: Building2, worker: UserCheck, client: Users, nominee: Users, administrator: ShieldCheck
   }
   const roleColor: Record<string, string> = {
     provider: 'bg-blue-100 text-blue-700',
-    carer: 'bg-green-100 text-green-700',
+    worker: 'bg-green-100 text-green-700',
     client: 'bg-purple-100 text-purple-700',
     nominee: 'bg-orange-100 text-orange-700',
     administrator: 'bg-gray-900 text-white',
@@ -159,7 +159,7 @@ export default function AdminPage() {
 
   const counts = {
     provider: users.filter(u => u.role === 'provider').length,
-    carer: users.filter(u => u.role === 'carer').length,
+    worker: users.filter(u => u.role === 'carer').length,
     client: users.filter(u => u.role === 'client').length,
     nominee: users.filter(u => u.role === 'nominee').length,
     administrator: users.filter(u => u.role === 'administrator').length,
@@ -191,7 +191,7 @@ export default function AdminPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-5 gap-4 mb-8">
-          {(['provider','carer','client','nominee','administrator'] as const).map(role => {
+          {(['provider','worker','client','nominee','administrator'] as const).map(role => {
             const Icon = roleIcon[role]
             return (
               <div key={role} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">

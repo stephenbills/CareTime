@@ -53,7 +53,7 @@ export default function NewCarerPage() {
     })
     const inviteData = await inviteRes.json()
     if (!inviteRes.ok) {
-      // Don't block — carer is saved, just warn about invite
+      // Don't block — worker is saved, just warn about invite
       console.warn('Invite failed:', inviteData.error)
     }
 
@@ -68,9 +68,9 @@ export default function NewCarerPage() {
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Add Carer</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Add Worker</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            An invitation email will be sent to the carer to set their password
+            An invitation email will be sent to the worker to set their password
           </p>
         </div>
       </div>

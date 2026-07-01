@@ -36,7 +36,7 @@ function formatDate(iso: string) {
 }
 
 export default function CarerDashboard() {
-  const [carer, setCarer] = useState<any>(null)
+  const [worker, setCarer] = useState<any>(null)
   const [todayActs, setTodayActs] = useState<any[]>([])
   const [awaitingCount, setAwaitingCount] = useState(0)
   const [upcoming, setUpcoming] = useState<any[]>([])
@@ -49,7 +49,7 @@ export default function CarerDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Get carer record
+      // Get worker record
       const { data: carerData } = await supabase
         .from('carers').select('*').eq('user_id', user.id).maybeSingle()
       setCarer(carerData)
@@ -92,10 +92,10 @@ export default function CarerDashboard() {
     </div>
   )
 
-  if (!carer) return (
+  if (!worker) return (
     <div className="p-4">
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-        Your Carer profile hasn't been set up yet. Please contact your Provider.
+        Your Worker profile hasn't been set up yet. Please contact your Provider.
       </div>
     </div>
   )
@@ -105,7 +105,7 @@ export default function CarerDashboard() {
       {/* Welcome */}
       <div className="pt-1">
         <p className="text-gray-400 text-xs">Good {getTimeOfDay()}</p>
-        <h1 className="text-xl font-bold text-gray-900">{carer.name}</h1>
+        <h1 className="text-xl font-bold text-gray-900">{worker.name}</h1>
       </div>
 
       {/* Stats row */}
@@ -128,7 +128,7 @@ export default function CarerDashboard() {
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Today's Activities</h2>
           <div className="space-y-2">
             {todayActs.map(act => (
-              <Link key={act.id} href={`/carer/activities/${act.id}`}
+              <Link key={act.id} href={`/worker/activities/${act.id}`}
                 className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-blue-200 active:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <p className="font-semibold text-gray-900 text-sm leading-tight">{act.title}</p>
@@ -170,7 +170,7 @@ export default function CarerDashboard() {
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Upcoming</h2>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
             {upcoming.map(act => (
-              <Link key={act.id} href={`/carer/activities/${act.id}`}
+              <Link key={act.id} href={`/worker/activities/${act.id}`}
                 className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{act.title}</p>

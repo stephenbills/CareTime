@@ -30,6 +30,13 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+function toLocalInput(iso: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-AU', {
     weekday: 'short', day: 'numeric', month: 'short',
@@ -50,6 +57,8 @@ export default function CarerActivityPage() {
   const [comments, setComments] = useState('')
   const [mileage, setMileage] = useState('')
   const [expenses, setExpenses] = useState('')
+  const [actualStart, setActualStart] = useState('')
+  const [actualEnd, setActualEnd] = useState('')
   const [showSubmitForm, setShowSubmitForm] = useState(false)
   const params = useParams()
   const router = useRouter()
@@ -101,7 +110,7 @@ export default function CarerActivityPage() {
     if (client?.email) {
       notify('activity_accepted', client.email, {
         recipientName: client.name,
-        carerName: activity?.carer_name || 'Your carer',
+        carerName: activity?.carer_name || 'Your worker',
         activityTitle: activity?.title,
         activityId: id,
       })
@@ -113,12 +122,12 @@ export default function CarerActivityPage() {
     if (provider?.email) {
       notify('activity_declined', provider.email, {
         recipientName: provider.name,
-        carerName: 'Your carer',
+        carerName: 'Your worker',
         activityTitle: activity?.title,
         activityId: id,
       })
     }
-    router.push('/carer/dashboard')
+    router.push('/worker/dashboard')
   }
 
   async function handleStartShift() {
@@ -128,13 +137,21 @@ export default function CarerActivityPage() {
   }
 
   async function handleEndShift() {
+    // Pre-fill times so Worker can override if submitting late
+    setActualStart(toLocalInput(activity.actual_start_time || activity.start_time))
+    setActualEnd(toLocalInput(new Date().toISOString()))
     setShowSubmitForm(true)
   }
 
   async function handleSubmit() {
     if (!comments.trim()) { setError('Please add comments before submitting'); return }
+    if (!actualStart) { setError('Please enter the actual start time'); return }
+    if (!actualEnd) { setError('Please enter the actual end time'); return }
+    if (new Date(actualStart) >= new Date(actualEnd)) { setError('End time must be after start time'); return }
+
     await updateStatus('awaiting_client_approval', {
-      actual_end_time: new Date().toISOString(),
+      actual_start_time: new Date(actualStart).toISOString(),
+      actual_end_time: new Date(actualEnd).toISOString(),
       carer_comments: comments,
       mileage: mileage ? parseFloat(mileage) : null,
       expenses: expenses ? parseFloat(expenses) : null,
@@ -146,10 +163,10 @@ export default function CarerActivityPage() {
     for (const email of recipients) {
       notify('shift_submitted', email, {
         recipientName: email === client?.email ? client?.name : provider?.name,
-        carerName: 'Your carer',
+        carerName: 'Your worker',
         activityTitle: activity?.title,
-        startTime: formatDateTime(activity?.actual_start_time || activity?.start_time),
-        endTime: formatDateTime(new Date().toISOString()),
+        startTime: formatDateTime(actualStart),
+        endTime: formatDateTime(actualEnd),
         totalCost: 'See activity for details',
         activityId: id,
       })
@@ -177,7 +194,7 @@ export default function CarerActivityPage() {
     <div className="p-4 space-y-4 pb-8">
       {/* Header */}
       <div className="flex items-center gap-3 pt-1">
-        <Link href="/carer/dashboard" className="p-1 text-gray-400 hover:text-gray-600">
+        <Link href="/worker/calendar" className="p-1 text-gray-400 hover:text-gray-600">
           <ArrowLeft size={20} />
         </Link>
         <h1 className="text-lg font-bold text-gray-900 flex-1 leading-tight">{activity.title}</h1>
@@ -231,6 +248,25 @@ export default function CarerActivityPage() {
       {showSubmitForm && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
           <h2 className="font-semibold text-gray-900">Submit Shift Details</h2>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                Actual Start <span className="text-red-500">*</span>
+              </label>
+              <input type="datetime-local" value={actualStart}
+                onChange={e => setActualStart(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                Actual End <span className="text-red-500">*</span>
+              </label>
+              <input type="datetime-local" value={actualEnd}
+                onChange={e => setActualEnd(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Comments <span className="text-red-500">*</span></label>

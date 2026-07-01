@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Users, UserCheck, Activity, Clock } from 'lucide-react'
 
 async function getStats(supabase: any) {
-  const [clients, carers, activities, pending] = await Promise.all([
+  const [clients, workers, activities, pending] = await Promise.all([
     supabase.from('clients').select('id', { count: 'exact' }).eq('active', true),
     supabase.from('carers').select('id', { count: 'exact' }).eq('active', true),
     supabase.from('activities').select('id', { count: 'exact' })
@@ -12,7 +12,7 @@ async function getStats(supabase: any) {
   ])
   return {
     clients: clients.count ?? 0,
-    carers: carers.count ?? 0,
+    workers: workers.count ?? 0,
     activities: activities.count ?? 0,
     pending: pending.count ?? 0,
   }
@@ -25,7 +25,7 @@ export default async function DashboardPage() {
 
   const cards = [
     { label: 'Active Clients', value: stats.clients, icon: Users, color: 'bg-blue-500' },
-    { label: 'Active Carers', value: stats.carers, icon: UserCheck, color: 'bg-green-500' },
+    { label: 'Active Workers', value: stats.workers, icon: UserCheck, color: 'bg-green-500' },
     { label: 'Activities This Month', value: stats.activities, icon: Activity, color: 'bg-purple-500' },
     { label: 'Awaiting Approval', value: stats.pending, icon: Clock, color: 'bg-amber-500' },
   ]

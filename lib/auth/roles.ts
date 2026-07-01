@@ -1,10 +1,10 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
-export type UserRole = 'provider' | 'carer' | 'client' | 'nominee' | 'administrator' | null
+export type UserRole = 'provider' | 'worker' | 'client' | 'nominee' | 'administrator' | null
 
 export const ROLE_ROUTES: Record<string, string> = {
   provider: '/provider/dashboard',
-  carer: '/carer/dashboard',
+  worker: '/worker/dashboard',
   client: '/provider/dashboard',    // TODO: client screens
   nominee: '/provider/dashboard',   // TODO: nominee screens
   administrator: '/admin',
@@ -18,7 +18,7 @@ export async function detectUserRole(
 ): Promise<UserRole> {
   const [
     { data: provider },
-    { data: carer },
+    { data: worker },
     { data: client },
     { data: nominee },
     { data: admin },
@@ -31,7 +31,7 @@ export async function detectUserRole(
   ])
 
   if (provider) return 'provider'
-  if (carer) return 'carer'
+  if (worker) return 'worker'
   if (client) return 'client'
   if (nominee) return 'nominee'
   if (admin) return 'administrator'

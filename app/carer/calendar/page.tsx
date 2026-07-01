@@ -35,11 +35,11 @@ export default function CarerCalendar() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: carer } = await supabase
+      const { data: worker } = await supabase
         .from('carers').select('id').eq('user_id', user.id).maybeSingle()
-      if (!carer) return
-      setCarerId(carer.id)
-      loadMonth(carer.id, year, month)
+      if (!worker) return
+      setCarerId(worker.id)
+      loadMonth(worker.id, year, month)
     }
     load()
   }, [])
@@ -151,7 +151,7 @@ export default function CarerCalendar() {
           ) : (
             <div className="space-y-2">
               {selectedActs.map(act => (
-                <Link key={act.id} href={`/carer/activities/${act.id}`}
+                <Link key={act.id} href={`/worker/activities/${act.id}`}
                   className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 active:bg-gray-50">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <p className="font-semibold text-gray-900 text-sm">{act.title}</p>

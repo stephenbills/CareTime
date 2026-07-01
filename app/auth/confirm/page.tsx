@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 const ROLE_ROUTES: Record<string, string> = {
   provider: '/provider/dashboard',
-  carer: '/carer/dashboard',
+  worker: '/worker/dashboard',
   client: '/provider/dashboard',
   nominee: '/provider/dashboard',
   administrator: '/admin',
@@ -34,7 +34,7 @@ function ConfirmInner() {
       // Determine role by checking which app table this user appears in
       const admin = supabase // Using regular client here since user is now authenticated
       const [
-        { data: carer },
+        { data: worker },
         { data: provider },
         { data: nominee },
       ] = await Promise.all([
@@ -47,7 +47,7 @@ function ConfirmInner() {
       const roleHint = searchParams?.get('role') || ''
 
       let destination = '/provider/dashboard'
-      if (carer) destination = '/carer/dashboard'
+      if (worker) destination = '/worker/dashboard'
       else if (provider) destination = '/provider/dashboard'
       else if (nominee) destination = '/provider/dashboard' // TODO: nominee screens
       else if (ROLE_ROUTES[roleHint]) destination = ROLE_ROUTES[roleHint]
