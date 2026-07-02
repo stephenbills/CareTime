@@ -11,29 +11,28 @@ function ResetForm() {
   const [done, setDone] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
   const [sessionError, setSessionError] = useState('')
+  const [userEmail, setUserEmail] = useState('')
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    // Supabase puts tokens in the URL hash when redirecting from a reset link.
-    // We need to let the Supabase client exchange them for a session before
-    // calling updateUser — otherwise there's no active session.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          // Session established from the reset link — ready to update password
+        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
           setSessionReady(true)
-        } else if (event === 'SIGNED_IN' && session) {
-          setSessionReady(true)
+          // Show which account is being reset
+          if (session?.user?.email) {
+            setUserEmail(session.user.email)
+          }
         }
       }
     )
-
-    // Also check if already have a session (e.g. page reload)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setSessionReady(true)
+      if (session) {
+        setSessionReady(true)
+        if (session.user?.email) setUserEmail(session.user.email)
+      }
     })
-
     return () => subscription.unsubscribe()
   }, [])
 
@@ -88,6 +87,12 @@ function ResetForm() {
           </div>
         ) : (
           <form onSubmit={handleReset} className="space-y-4">
+            {userEmail && (
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                <p className="text-xs text-blue-500 mb-0.5">Setting password for</p>
+                <p className="text-sm font-semibold text-blue-800">{userEmail}</p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
