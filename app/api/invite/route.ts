@@ -69,9 +69,9 @@ export async function POST(req: NextRequest) {
       userId = created.user.id
       console.log('[/api/invite] Created user:', userId)
 
-      // Send password reset via Supabase so they can set their own password
+      // Generate a password reset link and send via Brevo API directly
       const resetUrl = `${APP_URL}/auth/reset-password`
-      const { error: resetError } = await admin.auth.admin.generateLink({
+      const { data: linkData, error: resetError } = await admin.auth.admin.generateLink({
         type: 'recovery',
         email,
         options: { redirectTo: resetUrl },
@@ -80,7 +80,43 @@ export async function POST(req: NextRequest) {
       if (resetError) {
         console.warn('[/api/invite] generateLink error:', resetError.message)
       } else {
-        console.log('[/api/invite] Password reset link generated')
+        const resetLink = linkData?.properties?.action_link
+        if (resetLink) {
+          // Send via Brevo API directly — bypasses Supabase SMTP
+          const resetHtml = `
+<!DOCTYPE html><html><head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:0;background-color:#f9fafb;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:12px;overflow:hidden;">
+<tr><td style="background-color:#2563eb;padding:20px 28px;">
+  <span style="color:#fff;font-size:16px;font-weight:600;">CareTime</span>
+</td></tr>
+<tr><td style="padding:32px 28px;">
+  <h1 style="margin:0 0 12px 0;font-size:18px;color:#111827;">Set Your Password</h1>
+  <p style="margin:0 0 20px 0;font-size:14px;color:#4b5563;line-height:1.5;">
+    Your CareTime account has been created. Click below to set your password and get started.
+  </p>
+  <table cellpadding="0" cellspacing="0"><tr>
+    <td style="background-color:#2563eb;border-radius:8px;">
+      <a href="${resetLink}" style="display:inline-block;padding:10px 20px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">
+        Set My Password
+      </a>
+    </td>
+  </tr></table>
+  <p style="margin:20px 0 0 0;font-size:13px;color:#9ca3af;">This link expires in 24 hours.</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
+          try {
+            await sendEmail({ to: email, subject: 'Set your CareTime password', html: resetHtml })
+            console.log('[/api/invite] Password setup email sent via Brevo to', email)
+          } catch (emailErr: any) {
+            console.warn('[/api/invite] Brevo reset email failed:', emailErr.message)
+          }
+        }
       }
     }
 

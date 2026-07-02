@@ -48,12 +48,16 @@ export default function LoginPage() {
     setResetLoading(true)
     setError('')
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${APP_URL}/auth/reset-password`,
+    // Use our server-side API which sends via Brevo directly
+    const res = await fetch('/api/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     })
+    const result = await res.json()
 
-    if (resetError) {
-      setError(resetError.message)
+    if (!res.ok) {
+      setError(result.error || 'Failed to send reset email. Please try again.')
     } else {
       setResetSent(true)
     }
