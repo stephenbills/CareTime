@@ -40,8 +40,9 @@ export async function POST(req: NextRequest) {
     const confirmUrl = `${APP_URL}/auth/confirm?role=${ROLE_ROUTE[role] || role}`
 
     // Check if a Supabase auth user already exists with this email
-    const { data: existingUsers } = await admin.auth.admin.listUsers()
-    const existing = existingUsers?.users?.find((u: any) => u.email === email)
+    // Use getUserByEmail (admin) rather than listUsers which paginates and may miss users
+    const { data: existingData } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    const existing = existingData?.users?.find((u: any) => u.email?.toLowerCase() === email.toLowerCase())
 
     let userId: string
 
