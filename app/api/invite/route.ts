@@ -70,8 +70,28 @@ export async function POST(req: NextRequest) {
       })
 
       if (error) {
-        console.error('[/api/invite] Supabase invite error:', error.message)
-        return NextResponse.json({ error: error.message }, { status: 400 })
+        console.error('[/api/invite] Supabase invite error:', JSON.stringify(error))
+        console.error('[/api/invite] Error status:', error.status)
+        console.error('[/api/invite] Error message:', error.message)
+        console.error('[/api/invite] Error name:', error.name)
+
+        // Fallback — send a Brevo login/reset email so the user gets something
+        const { subject, html } = welcomeEmail({
+          name: name || email,
+          role: ROLE_ROUTE[role] || role,
+          loginUrl: `${APP_URL}/auth/login`,
+        })
+        try {
+          await sendEmail({ to: email, subject, html })
+          console.log('[/api/invite] Sent fallback Brevo email to', email)
+          return NextResponse.json({
+            success: true,
+            warning: 'Supabase invite failed — sent login details email instead via Brevo'
+          })
+        } catch (emailErr: any) {
+          console.error('[/api/invite] Brevo fallback also failed:', emailErr.message)
+          return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 400 })
+        }
       }
 
       userId = data.user.id
