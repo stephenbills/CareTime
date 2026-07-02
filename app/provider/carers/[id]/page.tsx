@@ -133,7 +133,7 @@ export default function CarerDetailPage() {
     const res = await fetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: data.email, name: data.name, role: 'carer', recordId: id }),
+      body: JSON.stringify({ email: data.email, name: data.name, role: 'worker', recordId: id }),
     })
     const result = await res.json()
 

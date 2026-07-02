@@ -270,10 +270,13 @@ export function providerRelationshipRequestEmail(opts: {
 export function welcomeEmail(opts: {
   name: string; role: string; loginUrl: string
 }) {
+  const roleLabel = opts.role.charAt(0).toUpperCase() + opts.role.slice(1)
   const content = `
-    ${heading('Welcome to CareTime')}
-    ${paragraph(`Hi ${opts.name}, your ${opts.role} account has been created. You can now log in to CareTime.`)}
-    ${button('Log In', opts.loginUrl)}
+    ${heading('Your CareTime Login')}
+    ${paragraph(`Hi ${opts.name}, you have been invited to use CareTime as a ${roleLabel}.`)}
+    ${paragraph('Click the button below to log in. If this is your first time, you may need to reset your password using the "Forgot password" option on the login page.')}
+    ${button('Log In to CareTime', opts.loginUrl)}
+    ${paragraph('If you have any trouble logging in, please contact your Provider.')}
   `
-  return { subject: 'Welcome to CareTime', html: wrapper(content) }
+  return { subject: 'Your CareTime login details', html: wrapper(content) }
 }

@@ -49,7 +49,7 @@ export default function NewCarerPage() {
     const inviteRes = await fetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: data.email, name: data.name, role: 'carer', recordId: created.id }),
+      body: JSON.stringify({ email: data.email, name: data.name, role: 'worker', recordId: created.id }),
     })
     const inviteData = await inviteRes.json()
     if (!inviteRes.ok) {
