@@ -5,8 +5,8 @@ export type UserRole = 'provider' | 'worker' | 'client' | 'nominee' | 'administr
 export const ROLE_ROUTES: Record<string, string> = {
   provider: '/provider/dashboard',
   worker: '/worker/dashboard',
-  client: '/provider/dashboard',    // TODO: client screens
-  nominee: '/provider/dashboard',   // TODO: nominee screens
+  client: '/client/dashboard',
+  nominee: '/client/dashboard',   // Nominees use Client interface for now
   administrator: '/admin',
 }
 

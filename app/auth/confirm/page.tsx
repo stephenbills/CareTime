@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 const ROLE_ROUTES: Record<string, string> = {
   provider: '/provider/dashboard',
   worker: '/worker/dashboard',
-  client: '/provider/dashboard',
-  nominee: '/provider/dashboard',
+  client: '/client/dashboard',
+  nominee: '/client/dashboard',
   administrator: '/admin',
 }
 
@@ -37,10 +37,12 @@ function ConfirmInner() {
         { data: worker },
         { data: provider },
         { data: nominee },
+        { data: clientRecord },
       ] = await Promise.all([
         admin.from('carers').select('id').eq('user_id', user.id).maybeSingle(),
         admin.from('providers').select('id').eq('user_id', user.id).maybeSingle(),
         admin.from('nominees').select('id').eq('user_id', user.id).maybeSingle(),
+        admin.from('clients').select('id').eq('user_id', user.id).maybeSingle(),
       ])
 
       // Also check role hint from URL query param (passed in invite redirectTo)
@@ -49,7 +51,8 @@ function ConfirmInner() {
       let destination = '/provider/dashboard'
       if (worker) destination = '/worker/dashboard'
       else if (provider) destination = '/provider/dashboard'
-      else if (nominee) destination = '/provider/dashboard' // TODO: nominee screens
+      else if (clientRecord) destination = '/client/dashboard'
+      else if (nominee) destination = '/client/dashboard'
       else if (ROLE_ROUTES[roleHint]) destination = ROLE_ROUTES[roleHint]
 
       setStatus('success')
