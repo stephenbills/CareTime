@@ -1,5 +1,5 @@
 'use client'
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -9,8 +9,33 @@ function ResetForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
+  const [sessionError, setSessionError] = useState('')
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    // Supabase puts tokens in the URL hash when redirecting from a reset link.
+    // We need to let the Supabase client exchange them for a session before
+    // calling updateUser — otherwise there's no active session.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          // Session established from the reset link — ready to update password
+          setSessionReady(true)
+        } else if (event === 'SIGNED_IN' && session) {
+          setSessionReady(true)
+        }
+      }
+    )
+
+    // Also check if already have a session (e.g. page reload)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setSessionReady(true)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
@@ -22,6 +47,8 @@ function ResetForm() {
     const { error: err } = await supabase.auth.updateUser({ password })
     if (err) { setError(err.message); setLoading(false); return }
 
+    // Sign out after password change so they log in fresh with new credentials
+    await supabase.auth.signOut()
     setDone(true)
     setTimeout(() => router.push('/auth/login'), 2500)
   }
@@ -35,7 +62,7 @@ function ResetForm() {
           </div>
         </div>
         <h1 className="text-xl font-bold text-center text-gray-900 mb-1">Set New Password</h1>
-        <p className="text-center text-gray-500 text-sm mb-6">Choose a new password for your account</p>
+        <p className="text-center text-gray-500 text-sm mb-6">Choose a new password for your CareTime account</p>
 
         {done ? (
           <div className="text-center space-y-3">
@@ -45,13 +72,27 @@ function ResetForm() {
             <p className="text-gray-700 text-sm font-medium">Password updated successfully</p>
             <p className="text-gray-400 text-xs">Redirecting to login…</p>
           </div>
+        ) : sessionError ? (
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              {sessionError}
+            </div>
+            <a href="/auth/login" className="block text-center text-blue-600 text-sm hover:underline">
+              Return to login
+            </a>
+          </div>
+        ) : !sessionReady ? (
+          <div className="text-center space-y-3">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-gray-400 text-sm">Verifying reset link…</p>
+          </div>
         ) : (
           <form onSubmit={handleReset} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Min 6 characters" required autoComplete="new-password" />
+                placeholder="Min 6 characters" required autoComplete="new-password" autoFocus />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
