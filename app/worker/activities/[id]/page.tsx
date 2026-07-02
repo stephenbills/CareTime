@@ -113,6 +113,7 @@ export default function CarerActivityPage() {
         carerName: activity?.carer_name || 'Your worker',
         activityTitle: activity?.title,
         activityId: id,
+        role: 'client',
       })
     }
   }
@@ -125,6 +126,7 @@ export default function CarerActivityPage() {
         carerName: 'Your worker',
         activityTitle: activity?.title,
         activityId: id,
+        role: 'provider',
       })
     }
     router.push('/worker/dashboard')

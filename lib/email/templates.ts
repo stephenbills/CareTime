@@ -98,23 +98,25 @@ export function activityAssignedEmail(opts: {
 }
 
 export function activityAcceptedEmail(opts: {
-  recipientName: string; carerName: string; activityTitle: string; activityId: string
+  recipientName: string; carerName: string; activityTitle: string; activityId: string; role?: string
 }) {
+  const role = opts.role || 'worker'
   const content = `
     ${heading('Activity Accepted')}
     ${paragraph(`Hi ${opts.recipientName}, ${opts.carerName} has accepted the activity "${opts.activityTitle}".`)}
-    ${button('View Activity', `${APP_URL}/worker/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/${role}/activities/${opts.activityId}`)}
   `
   return { subject: `Activity accepted: ${opts.activityTitle}`, html: wrapper(content) }
 }
 
 export function activityDeclinedEmail(opts: {
-  recipientName: string; carerName: string; activityTitle: string; activityId: string
+  recipientName: string; carerName: string; activityTitle: string; activityId: string; role?: string
 }) {
+  const role = opts.role || 'provider'
   const content = `
     ${heading('Activity Declined')}
     ${paragraph(`Hi ${opts.recipientName}, ${opts.carerName} has declined the activity "${opts.activityTitle}". Please reassign a Worker.`)}
-    ${button('Reassign Activity', `${APP_URL}/worker/activities/${opts.activityId}`)}
+    ${button('Reassign Activity', `${APP_URL}/${role}/activities/${opts.activityId}`)}
   `
   return { subject: `Activity declined: ${opts.activityTitle}`, html: wrapper(content) }
 }

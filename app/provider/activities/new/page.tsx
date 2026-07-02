@@ -247,6 +247,7 @@ export default function ActivityPage() {
             carerName: selectedCarer?.name || 'The worker',
             activityTitle: payload.title,
             activityId: id,
+            role: 'client',
           })
         }
         if (payload.status === 'awaiting_client_approval' && selectedClient?.email) {
