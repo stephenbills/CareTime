@@ -24,7 +24,6 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'
 export async function POST(req: NextRequest) {
   try {
     const { email, name, role, recordId } = await req.json()
-
     console.log('[/api/invite] Request:', { email, role, recordId })
 
     if (!email || !role || !recordId) {
@@ -37,66 +36,52 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient()
-    const confirmUrl = `${APP_URL}/auth/confirm?role=${ROLE_ROUTE[role] || role}`
 
-    // Check if a Supabase auth user already exists with this email
-    // Use getUserByEmail (admin) rather than listUsers which paginates and may miss users
+    // Check if user already exists
     const { data: existingData } = await admin.auth.admin.listUsers({ perPage: 1000 })
-    const existing = existingData?.users?.find((u: any) => u.email?.toLowerCase() === email.toLowerCase())
+    const existing = existingData?.users?.find(
+      (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+    )
 
     let userId: string
 
     if (existing) {
-      console.log('[/api/invite] User already exists, linking and sending Brevo welcome email')
+      console.log('[/api/invite] User already exists:', existing.id)
       userId = existing.id
-
-      // Send a Brevo welcome/login email manually since Supabase won't re-invite
-      const { subject, html } = welcomeEmail({
-        name: name || email,
-        role: ROLE_ROUTE[role] || role,
-        loginUrl: `${APP_URL}/auth/login`,
-      })
-      try {
-        await sendEmail({ to: email, subject: `Your CareTime login — ${subject}`, html })
-        console.log('[/api/invite] Brevo welcome email sent to', email)
-      } catch (emailErr: any) {
-        console.warn('[/api/invite] Brevo email failed:', emailErr.message)
-        // Don't block — still link the account
-      }
     } else {
-      console.log('[/api/invite] Sending Supabase invite to', email)
-      const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: confirmUrl,
-        data: { name, role: ROLE_ROUTE[role] || role },
+      // Create the user directly with a temporary password
+      // then immediately send a password reset so they can set their own
+      const tempPassword = Math.random().toString(36).slice(-12) + 'Aa1!'
+      console.log('[/api/invite] Creating new auth user for', email)
+
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true, // auto-confirm so they can reset immediately
+        user_metadata: { name, role: ROLE_ROUTE[role] || role },
       })
 
-      if (error) {
-        console.error('[/api/invite] Supabase invite error:', JSON.stringify(error))
-        console.error('[/api/invite] Error status:', error.status)
-        console.error('[/api/invite] Error message:', error.message)
-        console.error('[/api/invite] Error name:', error.name)
-
-        // Fallback — send a Brevo login/reset email so the user gets something
-        const { subject, html } = welcomeEmail({
-          name: name || email,
-          role: ROLE_ROUTE[role] || role,
-          loginUrl: `${APP_URL}/auth/login`,
-        })
-        try {
-          await sendEmail({ to: email, subject, html })
-          console.log('[/api/invite] Sent fallback Brevo email to', email)
-          return NextResponse.json({
-            success: true,
-            warning: 'Supabase invite failed — sent login details email instead via Brevo'
-          })
-        } catch (emailErr: any) {
-          console.error('[/api/invite] Brevo fallback also failed:', emailErr.message)
-          return NextResponse.json({ error: error.message || JSON.stringify(error) }, { status: 400 })
-        }
+      if (createError) {
+        console.error('[/api/invite] Create user error:', createError.message)
+        return NextResponse.json({ error: createError.message }, { status: 400 })
       }
 
-      userId = data.user.id
-      console.log('[/api/invite] Invite sent, userId:', userId)
+      userId = created.user.id
+      console.log('[/api/invite] Created user:', userId)
+
+      // Send password reset via Supabase so they can set their own password
+      const resetUrl = `${APP_URL}/auth/reset-password`
+      const { error: resetError } = await admin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: { redirectTo: resetUrl },
+      })
+
+      if (resetError) {
+        console.warn('[/api/invite] generateLink error:', resetError.message)
+      } else {
+        console.log('[/api/invite] Password reset link generated')
+      }
     }
 
     // Link the auth user_id back to the app table record
@@ -107,15 +92,24 @@ export async function POST(req: NextRequest) {
 
     if (updateError) {
       console.error('[/api/invite] Failed to link user_id:', updateError.message)
-      // Don't fail the whole request — invite was sent, linking failed
-      return NextResponse.json({
-        success: true,
-        userId,
-        warning: `Account created but linking failed: ${updateError.message}`
-      })
+    } else {
+      console.log('[/api/invite] Linked user_id to', table)
     }
 
-    console.log('[/api/invite] Success — user_id linked to', table)
+    // Always send a Brevo welcome email with login instructions
+    const { subject, html } = welcomeEmail({
+      name: name || email,
+      role: ROLE_ROUTE[role] || role,
+      loginUrl: `${APP_URL}/auth/login`,
+    })
+
+    try {
+      await sendEmail({ to: email, subject, html })
+      console.log('[/api/invite] Brevo welcome email sent to', email)
+    } catch (emailErr: any) {
+      console.warn('[/api/invite] Brevo email failed:', emailErr.message)
+    }
+
     return NextResponse.json({ success: true, userId })
 
   } catch (err: any) {

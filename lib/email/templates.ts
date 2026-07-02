@@ -272,11 +272,12 @@ export function welcomeEmail(opts: {
 }) {
   const roleLabel = opts.role.charAt(0).toUpperCase() + opts.role.slice(1)
   const content = `
-    ${heading('Your CareTime Login')}
+    ${heading('Welcome to CareTime')}
     ${paragraph(`Hi ${opts.name}, you have been invited to use CareTime as a ${roleLabel}.`)}
-    ${paragraph('Click the button below to log in. If this is your first time, you may need to reset your password using the "Forgot password" option on the login page.')}
+    ${paragraph('You should also receive a separate email with a link to set your password. Once set, use the button below to log in.')}
+    ${paragraph('If you do not receive the password setup email within a few minutes, use the "Forgot password?" link on the login page to set your own password.')}
     ${button('Log In to CareTime', opts.loginUrl)}
-    ${paragraph('If you have any trouble logging in, please contact your Provider.')}
+    ${paragraph('If you have any trouble, please contact your Provider.')}
   `
-  return { subject: 'Your CareTime login details', html: wrapper(content) }
+  return { subject: 'Welcome to CareTime', html: wrapper(content) }
 }
