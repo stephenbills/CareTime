@@ -1,9 +1,10 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import WeekView from '@/components/WeekView'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 const DAYS = ['S','M','T','W','T','F','S']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -23,9 +24,17 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
-export default function WorkerCalendar() {
+function WorkerCalendarInner() {
   const today = new Date()
-  const [view, setView] = useState<'month' | 'week'>('month')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const initialView = (searchParams?.get('view') as 'month' | 'week') || 'month'
+  const [view, setView] = useState<'month' | 'week'>(initialView)
+
+  function switchView(v: 'month' | 'week') {
+    setView(v)
+    router.replace(`/worker/calendar?view=${v}`)
+  }
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
   const [activities, setActivities] = useState<any[]>([])
@@ -90,7 +99,7 @@ export default function WorkerCalendar() {
         <h1 className="text-xl font-bold text-gray-900">My Calendar</h1>
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
           {(['month', 'week'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)}
+            <button key={v} onClick={() => switchView(v)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
                 view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
               }`}>{v}</button>
@@ -179,5 +188,13 @@ export default function WorkerCalendar() {
         </>
       )}
     </div>
+  )
+}
+
+export default function WorkerCalendar() {
+  return (
+    <Suspense fallback={<div className="p-4 text-gray-400 text-sm">Loading…</div>}>
+      <WorkerCalendarInner />
+    </Suspense>
   )
 }

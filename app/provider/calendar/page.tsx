@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import WeekView from '@/components/WeekView'
+import { Suspense } from 'react'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -39,9 +40,17 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
-export default function CalendarPage() {
+function CalendarInner() {
   const today = new Date()
-  const [view, setView] = useState<'month' | 'week'>('month')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const initialView = (searchParams?.get('view') as 'month' | 'week') || 'month'
+  const [view, setView] = useState<'month' | 'week'>(initialView)
+
+  function switchView(v: 'month' | 'week') {
+    setView(v)
+    router.replace(`/provider/calendar?view=${v}`)
+  }
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
   const [activities, setActivities] = useState<any[]>([])
@@ -50,7 +59,6 @@ export default function CalendarPage() {
   const [workers, setCarers] = useState<Record<string, string>>({})
   const [filterClient, setFilterClient] = useState('')
   const [filterCarer, setFilterCarer] = useState('')
-  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
@@ -109,7 +117,7 @@ export default function CalendarPage() {
           {/* View toggle */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
             {(['month', 'week'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)}
+              <button key={v} onClick={() => switchView(v)}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
                   view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>{v}</button>
@@ -240,5 +248,13 @@ export default function CalendarPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-400 text-sm">Loading…</div>}>
+      <CalendarInner />
+    </Suspense>
   )
 }

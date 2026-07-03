@@ -330,7 +330,7 @@ export default function ActivityPage() {
     set('status', 'ready_for_payment')
     setSaving(false)
     setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    setTimeout(() => router.back(), 1000)
   }
 
   async function handleAssignWorker(carerId: string) {

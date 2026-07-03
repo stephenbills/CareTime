@@ -5,8 +5,10 @@ import Link from 'next/link'
 
 const DAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7) // 7am–8pm
-const HOUR_PX = 56
+
+// Full 24 hours
+const HOURS = Array.from({ length: 24 }, (_, i) => i)
+const HOUR_PX = 48
 
 const STATUS_BLOCK: Record<string, string> = {
   awaiting_acceptance: 'bg-yellow-400 text-yellow-900',
@@ -27,24 +29,26 @@ function startOfWeek(date: Date) {
   return d
 }
 
-function activityPosition(act: any) {
-  const start = new Date(act.start_time)
-  const end = new Date(act.end_time)
-  const startHour = start.getHours() + start.getMinutes() / 60
-  const endHour = end.getHours() + end.getMinutes() / 60
-  const topPx = (Math.max(7, startHour) - 7) * HOUR_PX
-  const heightPx = Math.max((Math.min(21, endHour) - Math.max(7, startHour)) * HOUR_PX, 20)
-  return { topPx, heightPx }
+function hourLabel(h: number) {
+  if (h === 0) return '12am'
+  if (h === 12) return '12pm'
+  return h < 12 ? `${h}am` : `${h - 12}pm`
+}
+
+interface ActivityBlock {
+  act: any
+  dayIndex: number  // which column (0-6)
+  topPx: number
+  heightPx: number
+  label: string
 }
 
 interface Props {
   activities: any[]
-  // labelField: what to show as the primary label in each block
-  // 'worker' = show worker name, 'client' = show client name, 'title' = show activity title
   labelField?: 'worker' | 'client' | 'title'
   workers?: Record<string, string>
   clients?: Record<string, string>
-  activityLinkBase?: string // e.g. '/provider/activities' or '/worker/activities'
+  activityLinkBase?: string
   initialWeek?: Date
 }
 
@@ -78,16 +82,62 @@ export default function WeekView({
   }
 
   function getLabel(act: any) {
+    const clientName = clients[act.client_id] || ''
+    const workerName = workers[act.carer_id] || ''
+    const clientFirst = clientName.split(' ')[0]
+    const workerFirst = workerName.split(' ')[0]
+
     if (labelField === 'worker') {
-      const name = workers[act.carer_id] || ''
-      return name.split(' ')[0] || act.title
+      return workerFirst || act.title
     }
     if (labelField === 'client') {
-      const name = clients[act.client_id] || ''
-      return name.split(' ')[0] || act.title
+      // Show "Client · Worker" if both available
+      if (clientFirst && workerFirst) return `${clientFirst} · ${workerFirst}`
+      return clientFirst || act.title
     }
     return act.title
   }
+
+  // Build activity blocks — handling overnight shifts by splitting across days
+  function buildBlocks(): ActivityBlock[] {
+    const blocks: ActivityBlock[] = []
+
+    for (const act of activities) {
+      const start = new Date(act.start_time)
+      const end = new Date(act.end_time)
+      const label = getLabel(act)
+
+      for (let di = 0; di < 7; di++) {
+        const day = weekDays[di]
+        const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999)
+
+        // Does this activity overlap with this day?
+        if (end <= dayStart || start > dayEnd) continue
+
+        // Clamp to this day's bounds
+        const blockStart = start < dayStart ? dayStart : start
+        const blockEnd = end > dayEnd ? dayEnd : end
+
+        const startHour = blockStart.getHours() + blockStart.getMinutes() / 60
+        const endHour = blockEnd.getHours() + blockEnd.getMinutes() / 60 +
+          (blockEnd >= dayEnd ? 0 : 0) // include full last hour if overnight
+
+        // If activity started previous day, show from top of this day
+        const topPx = (start < dayStart ? 0 : startHour) * HOUR_PX
+        const heightPx = Math.max(
+          (start < dayStart ? endHour : endHour - startHour) * HOUR_PX,
+          24
+        )
+
+        blocks.push({ act, dayIndex: di, topPx, heightPx, label })
+      }
+    }
+
+    return blocks
+  }
+
+  const blocks = buildBlocks()
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -102,8 +152,8 @@ export default function WeekView({
       </div>
 
       {/* Day headers */}
-      <div className="grid grid-cols-8 border-b border-gray-100">
-        <div className="w-10" />
+      <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: '40px repeat(7, 1fr)' }}>
+        <div />
         {weekDays.map((d, i) => {
           const isToday = d.toDateString() === today.toDateString()
           return (
@@ -118,51 +168,46 @@ export default function WeekView({
       </div>
 
       {/* Time grid */}
-      <div className="overflow-y-auto" style={{ maxHeight: '65vh' }}>
-        <div className="relative grid grid-cols-8">
-          {/* Grid lines */}
-          <div className="col-span-8 absolute inset-0 pointer-events-none">
+      <div className="overflow-y-auto" style={{ maxHeight: '70vh' }}>
+        <div className="relative" style={{ gridTemplateColumns: '40px repeat(7, 1fr)', display: 'grid' }}>
+
+          {/* Hour labels column */}
+          <div style={{ height: HOUR_PX * 24 }}>
             {HOURS.map(h => (
-              <div key={h} style={{ height: HOUR_PX }} className="grid grid-cols-8 border-b border-gray-50">
-                <div className="flex items-start justify-end pr-2 pt-1">
-                  <span className="text-xs text-gray-300">
-                    {h === 12 ? '12pm' : h < 12 ? `${h}am` : `${h-12}pm`}
-                  </span>
-                </div>
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className="border-l border-gray-50" />
-                ))}
+              <div key={h} style={{ height: HOUR_PX }}
+                className="flex items-start justify-end pr-2 pt-1 border-b border-gray-50">
+                <span className="text-xs text-gray-300 leading-none">{hourLabel(h)}</span>
               </div>
             ))}
           </div>
 
-          {/* Activity blocks */}
-          <div className="w-10" style={{ height: HOUR_PX * HOURS.length }} />
+          {/* Day columns — relative positioned for activity blocks */}
           {weekDays.map((day, di) => {
-            const dayActs = activities.filter(a => {
-              const d = new Date(a.start_time)
-              return d.toDateString() === day.toDateString()
-            })
             const isToday = day.toDateString() === today.toDateString()
+            const dayBlocks = blocks.filter(b => b.dayIndex === di)
             return (
-              <div key={di}
-                className={`relative ${isToday ? 'bg-blue-50/30' : ''}`}
-                style={{ height: HOUR_PX * HOURS.length }}>
-                {dayActs.map(act => {
-                  const { topPx, heightPx } = activityPosition(act)
-                  const label = getLabel(act)
-                  return (
-                    <Link key={act.id}
-                      href={`${activityLinkBase}/${act.id}`}
-                      className={`absolute left-0.5 right-0.5 rounded-md px-1 py-0.5 overflow-hidden text-xs font-medium leading-tight ${STATUS_BLOCK[act.status] || 'bg-blue-500 text-white'}`}
-                      style={{ top: topPx, height: heightPx }}>
-                      <span className="block truncate">{label}</span>
-                      {heightPx > 32 && (
-                        <span className="block truncate opacity-80 text-[10px]">{act.title}</span>
-                      )}
-                    </Link>
-                  )
-                })}
+              <div key={di} className={`relative border-l border-gray-50 ${isToday ? 'bg-blue-50/20' : ''}`}
+                style={{ height: HOUR_PX * 24 }}>
+                {/* Hour grid lines */}
+                {HOURS.map(h => (
+                  <div key={h} style={{ height: HOUR_PX }}
+                    className={`border-b ${h % 6 === 0 ? 'border-gray-100' : 'border-gray-50'}`} />
+                ))}
+
+                {/* Activity blocks */}
+                {dayBlocks.map(({ act, topPx, heightPx, label }) => (
+                  <Link key={`${act.id}-${di}`}
+                    href={`${activityLinkBase}/${act.id}`}
+                    className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden text-xs font-medium leading-tight z-10 ${
+                      STATUS_BLOCK[act.status] || 'bg-blue-500 text-white'
+                    }`}
+                    style={{ top: topPx, height: heightPx }}>
+                    <span className="block truncate">{label}</span>
+                    {heightPx > 32 && act.title !== label && (
+                      <span className="block truncate opacity-75 text-[10px]">{act.title}</span>
+                    )}
+                  </Link>
+                ))}
               </div>
             )
           })}

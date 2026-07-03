@@ -1,13 +1,13 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
+import WeekView from '@/components/WeekView'
 
 const DAYS_SHORT = ['S','M','T','W','T','F','S']
-const DAYS_FULL = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7) // 7am–8pm
 
 const STATUS_DOT: Record<string, string> = {
   scheduled: 'bg-blue-500',
@@ -17,16 +17,6 @@ const STATUS_DOT: Record<string, string> = {
   paid: 'bg-gray-300',
   rejected: 'bg-red-400',
   cancelled: 'bg-gray-200',
-}
-
-const STATUS_BLOCK: Record<string, string> = {
-  scheduled: 'bg-blue-500 text-white',
-  in_progress: 'bg-purple-500 text-white',
-  awaiting_client_approval: 'bg-orange-400 text-white',
-  awaiting_payment_approval: 'bg-indigo-400 text-white',
-  paid: 'bg-gray-200 text-gray-600',
-  rejected: 'bg-red-400 text-white',
-  cancelled: 'bg-gray-100 text-gray-400',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -39,37 +29,24 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-const HOUR_PX = 56 // height of each hour row in px
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
-function startOfWeek(date: Date) {
-  const d = new Date(date)
-  d.setDate(d.getDate() - d.getDay())
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
 // Returns top offset % and height % within a single hour cell
-function activityPosition(act: any) {
-  const start = new Date(act.start_time)
-  const end = new Date(act.end_time)
-  const startHour = start.getHours() + start.getMinutes() / 60
-  const endHour = end.getHours() + end.getMinutes() / 60
-  const topHour = Math.max(7, startHour)
-  const bottomHour = Math.min(21, endHour)
-  const topPx = (topHour - 7) * HOUR_PX
-  const heightPx = Math.max((bottomHour - topHour) * HOUR_PX, 20)
-  return { topPx, heightPx }
-}
-
-export default function ClientCalendar() {
+function ClientCalendarInner() {
   const today = new Date()
-  const [view, setView] = useState<'month' | 'week'>('month')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const initialView = (searchParams?.get('view') as 'month' | 'week') || 'month'
+  const [view, setView] = useState<'month' | 'week'>(initialView)
+
+  function switchView(v: 'month' | 'week') {
+    setView(v)
+    router.replace(`/client/calendar?view=${v}`)
+  }
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
-  const [weekStart, setWeekStart] = useState(startOfWeek(today))
   const [activities, setActivities] = useState<any[]>([])
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
   const [workers, setWorkers] = useState<Record<string, string>>({})
@@ -84,12 +61,12 @@ export default function ClientCalendar() {
         .from('clients').select('id').eq('user_id', user.id).maybeSingle()
       if (!client) return
       setClientId(client.id)
-      loadActivities(client.id, year, month, weekStart)
+      loadActivities(client.id, year, month)
     }
     init()
   }, [])
 
-  async function loadActivities(cid: string, y: number, m: number, ws: Date) {
+  async function loadActivities(cid: string, y: number, m: number) {
     const from = new Date(y, m - 1, 1).toISOString()
     const to = new Date(y, m + 2, 0, 23, 59, 59).toISOString()
     const [{ data: acts }, { data: wks }] = await Promise.all([
@@ -105,23 +82,13 @@ export default function ClientCalendar() {
     const nm = month === 0 ? 11 : month - 1
     const ny = month === 0 ? year - 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
-    if (clientId) loadActivities(clientId, ny, nm, weekStart)
+    if (clientId) loadActivities(clientId, ny, nm)
   }
   function nextMonth() {
     const nm = month === 11 ? 0 : month + 1
     const ny = month === 11 ? year + 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
-    if (clientId) loadActivities(clientId, ny, nm, weekStart)
-  }
-  function prevWeek() {
-    const ws = new Date(weekStart); ws.setDate(ws.getDate() - 7)
-    setWeekStart(ws); setYear(ws.getFullYear()); setMonth(ws.getMonth())
-    if (clientId) loadActivities(clientId, ws.getFullYear(), ws.getMonth(), ws)
-  }
-  function nextWeek() {
-    const ws = new Date(weekStart); ws.setDate(ws.getDate() + 7)
-    setWeekStart(ws); setYear(ws.getFullYear()); setMonth(ws.getMonth())
-    if (clientId) loadActivities(clientId, ws.getFullYear(), ws.getMonth(), ws)
+    if (clientId) loadActivities(clientId, ny, nm)
   }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -132,17 +99,6 @@ export default function ClientCalendar() {
       const d = new Date(a.start_time)
       return d.getDate() === date.getDate() && d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear()
     })
-  }
-
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart); d.setDate(d.getDate() + i); return d
-  })
-
-  function weekRangeLabel() {
-    const end = new Date(weekStart); end.setDate(end.getDate() + 6)
-    if (weekStart.getMonth() === end.getMonth())
-      return `${weekStart.getDate()}–${end.getDate()} ${MONTHS[weekStart.getMonth()]} ${weekStart.getFullYear()}`
-    return `${weekStart.getDate()} ${MONTHS[weekStart.getMonth()]} – ${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`
   }
 
   const selectedActs = selectedDay ? actsForDay(new Date(year, month, selectedDay)) : []
@@ -160,7 +116,7 @@ export default function ClientCalendar() {
       {/* View toggle */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
         {(['month', 'week'] as const).map(v => (
-          <button key={v} onClick={() => setView(v)}
+          <button key={v} onClick={() => switchView(v)}
             className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
               view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
             }`}>{v}</button>
@@ -237,79 +193,21 @@ export default function ClientCalendar() {
 
       {/* ── WEEK VIEW ── */}
       {view === 'week' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-            <button onClick={prevWeek} className="p-1.5 rounded-lg active:bg-gray-100"><ChevronLeft size={18} className="text-gray-500" /></button>
-            <span className="font-semibold text-gray-900 text-xs">{weekRangeLabel()}</span>
-            <button onClick={nextWeek} className="p-1.5 rounded-lg active:bg-gray-100"><ChevronRight size={18} className="text-gray-500" /></button>
-          </div>
-
-          {/* Day headers */}
-          <div className="grid grid-cols-8 border-b border-gray-100">
-            <div className="w-10" />
-            {weekDays.map((d, i) => {
-              const isToday = d.toDateString() === today.toDateString()
-              return (
-                <div key={i} className="py-2 text-center">
-                  <p className="text-xs text-gray-400">{DAYS_FULL[d.getDay()]}</p>
-                  <p className={`text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>
-                    {d.getDate()}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Time grid — absolute positioned activities spanning multiple hours */}
-          <div className="overflow-y-auto" style={{ maxHeight: '65vh' }}>
-            <div className="relative grid grid-cols-8">
-              {/* Hour labels + grid lines */}
-              <div className="col-span-8 absolute inset-0 grid grid-cols-8 pointer-events-none">
-                <div className="col-span-8">
-                  {HOURS.map(h => (
-                    <div key={h} style={{ height: HOUR_PX }} className="border-b border-gray-50 grid grid-cols-8">
-                      <div className="flex items-start justify-end pr-2 pt-1">
-                        <span className="text-xs text-gray-300">{h === 12 ? '12pm' : h < 12 ? `${h}am` : `${h-12}pm`}</span>
-                      </div>
-                      {Array.from({ length: 7 }).map((_, i) => (
-                        <div key={i} className="border-l border-gray-50" />
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Activity blocks per day column */}
-              <div className="w-10" style={{ height: HOUR_PX * HOURS.length }} />
-              {weekDays.map((day, di) => {
-                const dayActs = activities.filter(a => {
-                  const d = new Date(a.start_time)
-                  return d.toDateString() === day.toDateString()
-                })
-                const isToday = day.toDateString() === today.toDateString()
-                return (
-                  <div key={di} className={`relative ${isToday ? 'bg-blue-50/30' : ''}`}
-                    style={{ height: HOUR_PX * HOURS.length }}>
-                    {dayActs.map(act => {
-                      const { topPx, heightPx } = activityPosition(act)
-                      const workerName = workers[act.carer_id] || ''
-                      const firstName = workerName.split(' ')[0]
-                      return (
-                        <Link key={act.id} href={`/client/activities/${act.id}`}
-                          className={`absolute left-0.5 right-0.5 rounded-md px-1 py-0.5 overflow-hidden text-xs font-medium leading-tight ${STATUS_BLOCK[act.status] || 'bg-blue-500 text-white'}`}
-                          style={{ top: topPx, height: heightPx }}>
-                          <span className="block truncate">{firstName || act.title}</span>
-                          {heightPx > 32 && <span className="block truncate opacity-80 text-[10px]">{act.title}</span>}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+        <WeekView
+          activities={activities}
+          labelField="worker"
+          workers={workers}
+          activityLinkBase="/client/activities"
+        />
       )}
     </div>
+  )
+}
+
+export default function ClientCalendar() {
+  return (
+    <Suspense fallback={<div className="p-4 text-gray-400 text-sm">Loading…</div>}>
+      <ClientCalendarInner />
+    </Suspense>
   )
 }
