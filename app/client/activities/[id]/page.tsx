@@ -27,6 +27,7 @@ export default function ClientActivityPage() {
   const [activity, setActivity] = useState<any>(null)
   const [worker, setWorker] = useState<any>(null)
   const [provider, setProvider] = useState<any>(null)
+  const [clientName, setClientName] = useState('')
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
   const [error, setError] = useState('')
@@ -52,6 +53,10 @@ export default function ClientActivityPage() {
       act.carer_id ? supabase.from('carers').select('id, name, email').eq('id', act.carer_id).single() : Promise.resolve({ data: null }),
       act.provider_id ? supabase.from('providers').select('id, name, email').eq('id', act.provider_id).single() : Promise.resolve({ data: null }),
     ])
+    if (act.client_id) {
+      const { data: cl } = await supabase.from('clients').select('name').eq('id', act.client_id).single()
+      if (cl) setClientName(cl.name)
+    }
     setWorker(wk)
     setProvider(prov)
     setLoading(false)
@@ -84,17 +89,23 @@ export default function ClientActivityPage() {
     if (worker?.email) {
       notify('shift_approved', worker.email, {
         recipientName: worker.name,
-        clientName: activity.client_name || 'The client',
+        clientName: clientName || 'The client',
         activityTitle: activity.title,
         activityId: id,
+        clientComments: comments || undefined,
+        clientRating: rating || undefined,
+        role: 'worker',
       })
     }
     if (provider?.email) {
       notify('shift_approved', provider.email, {
         recipientName: provider.name,
-        clientName: activity.client_name || 'The client',
+        clientName: clientName || 'The client',
         activityTitle: activity.title,
         activityId: id,
+        clientComments: comments || undefined,
+        clientRating: rating || undefined,
+        role: 'provider',
       })
     }
 

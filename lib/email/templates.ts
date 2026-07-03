@@ -158,12 +158,19 @@ export function shiftSubmittedEmail(opts: {
 }
 
 export function shiftApprovedEmail(opts: {
-  recipientName: string; clientName: string; activityTitle: string; activityId: string
+  recipientName: string; clientName: string; activityTitle: string
+  activityId: string; clientComments?: string; clientRating?: number; role?: string
 }) {
+  const role = opts.role || 'worker'
+  const stars = opts.clientRating
+    ? '★'.repeat(opts.clientRating) + '☆'.repeat(5 - opts.clientRating)
+    : null
   const content = `
     ${heading('Shift Approved')}
     ${paragraph(`Hi ${opts.recipientName}, ${opts.clientName} has approved the shift "${opts.activityTitle}".`)}
-    ${button('View Activity', `${APP_URL}/worker/activities/${opts.activityId}`)}
+    ${stars ? detailsTable(detailRow('Rating', `${stars} (${opts.clientRating}/5)`)) : ''}
+    ${opts.clientComments ? detailsTable(detailRow('Client Comments', opts.clientComments)) : ''}
+    ${button('View Activity', `${APP_URL}/${role}/activities/${opts.activityId}`)}
   `
   return { subject: `Shift approved: ${opts.activityTitle}`, html: wrapper(content) }
 }

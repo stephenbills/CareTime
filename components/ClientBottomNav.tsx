@@ -2,11 +2,12 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, Calendar, LogOut } from 'lucide-react'
+import { LayoutDashboard, Calendar, MessageSquare, LogOut } from 'lucide-react'
 
 const NAV = [
   { label: 'Home', href: '/client/dashboard', icon: LayoutDashboard },
   { label: 'Calendar', href: '/client/calendar', icon: Calendar },
+  { label: 'Notes', href: '/client/notes', icon: MessageSquare },
 ]
 
 export default function ClientBottomNav() {
