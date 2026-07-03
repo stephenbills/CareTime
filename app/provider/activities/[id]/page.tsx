@@ -306,6 +306,57 @@ export default function ActivityPage() {
   const carerOptions = carers.map(c => ({ value: c.id, label: c.name }))
   const ndisOptions = ndisItems.map(n => ({ value: n.id, label: `${n.line_item_number} — ${n.description}` }))
 
+  // Quick action: approve for payment without opening the full form
+  async function handleApprovePayment() {
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: err } = await supabase.from('activities')
+      .update({ status: 'ready_for_payment' }).eq('id', id)
+    if (err) { setError(err.message); setSaving(false); return }
+    await supabase.from('activity_status_history').insert({
+      activity_id: id,
+      from_status: 'awaiting_payment_approval',
+      to_status: 'ready_for_payment',
+      changed_by: user!.id,
+    })
+    const selectedCarer = carers.find(c => c.id === data.carer_id)
+    if (selectedCarer?.email) {
+      notify('payment_approved', selectedCarer.email, {
+        carerName: selectedCarer.name,
+        activityTitle: data.title,
+        activityId: id,
+      })
+    }
+    set('status', 'ready_for_payment')
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function handleAssignWorker(carerId: string) {
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: err } = await supabase.from('activities')
+      .update({ carer_id: carerId, status: 'awaiting_acceptance' }).eq('id', id)
+    if (err) { setError(err.message); setSaving(false); return }
+    const selectedCarer = carers.find(c => c.id === carerId)
+    if (selectedCarer?.email) {
+      notify('activity_assigned', selectedCarer.email, {
+        carerName: selectedCarer.name,
+        activityTitle: data.title,
+        clientName: clients.find(c => c.id === data.client_id)?.name || '—',
+        startTime: data.start_time ? new Date(data.start_time).toLocaleString('en-AU') : '—',
+        endTime: data.end_time ? new Date(data.end_time).toLocaleString('en-AU') : '—',
+        activityId: id,
+      })
+    }
+    set('carer_id', carerId)
+    set('status', 'awaiting_acceptance')
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
   return (
     <div className="p-8 max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
@@ -321,6 +372,34 @@ export default function ActivityPage() {
           </p>
         </div>
       </div>
+
+      {/* Action panels — shown above the form for statuses requiring Provider action */}
+      {!isNew && data.status === 'awaiting_payment_approval' && (
+        <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+          <p className="text-sm font-semibold text-indigo-900 mb-1">Awaiting Your Payment Approval</p>
+          <p className="text-xs text-indigo-600 mb-3">The client has approved this shift. Review the details below and approve for payment.</p>
+          <button onClick={handleApprovePayment} disabled={saving}
+            className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            {saving ? 'Processing…' : '✓ Approve for Payment'}
+          </button>
+        </div>
+      )}
+
+      {!isNew && !data.carer_id && data.status !== 'cancelled' && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm font-semibold text-amber-900 mb-1">No Worker Assigned</p>
+          <p className="text-xs text-amber-600 mb-3">Select a Worker to assign this activity and send them a notification.</p>
+          <div className="flex gap-2 flex-wrap">
+            <select
+              onChange={e => e.target.value && handleAssignWorker(e.target.value)}
+              defaultValue=""
+              className="border border-amber-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+              <option value="">Select a Worker…</option>
+              {carerOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="space-y-6">
         <Section title="Activity Details">
