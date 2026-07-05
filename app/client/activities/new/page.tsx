@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
+import RecurrencePicker from '@/components/RecurrencePicker'
+import { RRule } from 'rrule'
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DURATIONS = [
   { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
   { label: '1.5 hours', value: 90 }, { label: '2 hours', value: 120 },
@@ -22,7 +23,6 @@ function toLocalInput(date?: Date) {
 }
 
 export default function ClientNewActivityPage() {
-  // Core fields
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [carerId, setCarerId] = useState('')
@@ -33,10 +33,8 @@ export default function ClientNewActivityPage() {
   const [endTime, setEndTime] = useState(toLocalInput(new Date(Date.now() + 2 * 60 * 60 * 1000)))
 
   // Recurrence
-  const [isRecurring, setIsRecurring] = useState(false)
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([])
-  const [recurStart, setRecurStart] = useState(new Date().toISOString().slice(0, 10))
-  const [recurEnd, setRecurEnd] = useState('')
+  const [rruleStr, setRruleStr] = useState<string | null>(null)
+  const [rruleDesc, setRruleDesc] = useState('Does not repeat')
   const [recurTime, setRecurTime] = useState('09:00')
   const [durationMins, setDurationMins] = useState(120)
 
@@ -66,7 +64,6 @@ export default function ClientNewActivityPage() {
         .from('clients').select('*, providers(id, name, email)').eq('user_id', user.id).maybeSingle()
       if (!client) return
       setClientId(client.id)
-
       const addr = [client.address_line1, client.suburb, client.state, client.postcode]
         .filter(Boolean).join(', ')
       if (addr) { setPickupAddress(addr); setDropoffAddress(addr) }
@@ -76,8 +73,6 @@ export default function ClientNewActivityPage() {
         setProviderId(prov.id)
         setProviderEmail(prov.email)
         setProviderName(prov.name)
-
-        // Load workers and NDIS items for this provider
         const [{ data: wks }, { data: ndis }] = await Promise.all([
           supabase.from('carers').select('id, name').eq('active', true).order('name'),
           supabase.from('ndis_line_items').select('id, line_item_number, description')
@@ -90,23 +85,35 @@ export default function ClientNewActivityPage() {
     load()
   }, [])
 
-  function toggleDay(day: number) {
-    setDaysOfWeek(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
-    )
+  const isRecurring = rruleStr !== null
+
+  function generateOccurrences(rruleString: string, startTimeStr: string, durationMin: number) {
+    const rule = RRule.fromString(rruleString)
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    const until = new Date(now)
+    until.setDate(until.getDate() + 28)
+
+    // Get occurrences for the next 4 weeks
+    const occurrences = rule.between(now, until, true)
+    const [sh, sm] = startTimeStr.split(':').map(Number)
+
+    return occurrences.map(occ => {
+      const start = new Date(occ)
+      start.setHours(sh, sm, 0, 0)
+      const end = new Date(start)
+      end.setMinutes(end.getMinutes() + durationMin)
+      return { start, end }
+    })
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-
     if (!title.trim()) { setError('Activity title is required'); return }
     if (!clientId) { setError('Your profile is not set up. Contact your Provider.'); return }
 
-    if (isRecurring) {
-      if (daysOfWeek.length === 0) { setError('Select at least one day for the recurring schedule'); return }
-      if (!recurStart) { setError('Start date is required'); return }
-    } else {
+    if (!isRecurring) {
       if (!startTime) { setError('Start time is required'); return }
       if (!endTime) { setError('End time is required'); return }
       if (new Date(startTime) >= new Date(endTime)) { setError('End time must be after start time'); return }
@@ -115,7 +122,20 @@ export default function ClientNewActivityPage() {
     setSaving(true)
 
     if (isRecurring) {
-      // Create a recurring schedule
+      // Extract days_of_week from rrule for backwards compat
+      let daysOfWeek: number[] = []
+      try {
+        const rule = RRule.fromString(rruleStr!)
+        const byDay = rule.origOptions.byweekday
+        if (byDay) {
+          daysOfWeek = (byDay as any[]).map((d: any) => {
+            const wd = typeof d === 'number' ? d : (d.weekday ?? d)
+            // rrule uses 0=Mon, we need 0=Sun
+            return (wd + 1) % 7
+          })
+        }
+      } catch {}
+
       const { data: created, error: err } = await supabase.from('recurring_schedules').insert({
         title: title.trim(),
         description: description || null,
@@ -123,11 +143,11 @@ export default function ClientNewActivityPage() {
         client_id: clientId,
         carer_id: carerId || null,
         ndis_line_item_id: ndisItemId || null,
-        days_of_week: daysOfWeek,
+        rrule: rruleStr,
+        days_of_week: daysOfWeek.length > 0 ? daysOfWeek : null,
         start_time: recurTime,
         duration_minutes: durationMins,
-        valid_from: recurStart,
-        valid_until: recurEnd || null,
+        valid_from: new Date().toISOString().slice(0, 10),
         pickup_address: pickupAddress || null,
         dropoff_address: dropoffAddress || null,
         venue_address: venueAddress || null,
@@ -136,45 +156,29 @@ export default function ClientNewActivityPage() {
 
       if (err) { setError(err.message); setSaving(false); return }
 
-      // Auto-generate first 4 weeks of activities
+      // Generate first 4 weeks of activities
       if (created) {
-        const today = new Date(); today.setHours(0, 0, 0, 0)
-        const until = new Date(today); until.setDate(until.getDate() + 28)
-        const validFrom = new Date(recurStart)
-        const endDate = recurEnd ? new Date(Math.min(new Date(recurEnd).getTime(), until.getTime())) : until
-        const current = new Date(today > validFrom ? today : validFrom)
-        const activities: any[] = []
-
-        while (current <= endDate) {
-          if (daysOfWeek.includes(current.getDay())) {
-            const [sh, sm] = recurTime.split(':').map(Number)
-            const start = new Date(current); start.setHours(sh, sm, 0, 0)
-            const end = new Date(start); end.setMinutes(end.getMinutes() + durationMins)
-            activities.push({
-              recurring_schedule_id: created.id,
-              provider_id: providerId,
-              client_id: clientId,
-              carer_id: carerId || null,
-              ndis_line_item_id: ndisItemId || null,
-              title: title.trim(),
-              description: description || null,
-              status: 'awaiting_acceptance',
-              start_time: start.toISOString(),
-              end_time: end.toISOString(),
-              pickup_address: pickupAddress || null,
-              dropoff_address: dropoffAddress || null,
-              venue_address: venueAddress || null,
-            })
-          }
-          current.setDate(current.getDate() + 1)
-        }
-
-        if (activities.length > 0) {
+        const occurrences = generateOccurrences(rruleStr!, recurTime, durationMins)
+        if (occurrences.length > 0) {
+          const activities = occurrences.map(({ start, end }) => ({
+            recurring_schedule_id: created.id,
+            provider_id: providerId,
+            client_id: clientId,
+            carer_id: carerId || null,
+            ndis_line_item_id: ndisItemId || null,
+            title: title.trim(),
+            description: description || null,
+            status: 'awaiting_acceptance',
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            pickup_address: pickupAddress || null,
+            dropoff_address: dropoffAddress || null,
+            venue_address: venueAddress || null,
+          }))
           await supabase.from('activities').insert(activities)
         }
       }
 
-      // Notify provider
       if (providerEmail) {
         notify('activity_changed', providerEmail, {
           recipientName: providerName || 'Provider',
@@ -185,7 +189,7 @@ export default function ClientNewActivityPage() {
         })
       }
     } else {
-      // Create a single activity
+      // One-off activity
       const { data: created, error: err } = await supabase.from('activities').insert({
         title: title.trim(),
         description: description || null,
@@ -203,22 +207,14 @@ export default function ClientNewActivityPage() {
 
       if (err) { setError(err.message); setSaving(false); return }
 
-      if (created) {
-        await supabase.from('activity_status_history').insert({
-          activity_id: created.id,
-          from_status: null,
-          to_status: 'awaiting_acceptance',
+      if (created && providerEmail) {
+        notify('activity_changed', providerEmail, {
+          recipientName: providerName || 'Provider',
+          activityTitle: title,
+          changedBy: 'a Client',
+          activityId: created.id,
+          role: 'provider',
         })
-
-        if (providerEmail) {
-          notify('activity_changed', providerEmail, {
-            recipientName: providerName || 'Provider',
-            activityTitle: title,
-            changedBy: 'a Client',
-            activityId: created.id,
-            role: 'provider',
-          })
-        }
       }
     }
 
@@ -257,8 +253,6 @@ export default function ClientNewActivityPage() {
               rows={2} placeholder="Any details your Worker should know…"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
-
-          {/* Optional worker */}
           {workers.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">
@@ -271,8 +265,6 @@ export default function ClientNewActivityPage() {
               </select>
             </div>
           )}
-
-          {/* Optional NDIS line item */}
           {ndisItems.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5">
@@ -281,41 +273,28 @@ export default function ClientNewActivityPage() {
               <select value={ndisItemId} onChange={e => setNdisItemId(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                 <option value="">— Select support type —</option>
-                {ndisItems.map(n => (
-                  <option key={n.id} value={n.id}>
-                    {n.line_item_number} — {n.description}
-                  </option>
-                ))}
+                {ndisItems.map(n => <option key={n.id} value={n.id}>{n.line_item_number} — {n.description}</option>)}
               </select>
             </div>
           )}
         </div>
 
-        {/* One-off vs recurring toggle */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <h2 className="font-semibold text-gray-900 text-sm mb-3">Schedule Type</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setIsRecurring(false)}
-              className={`py-3 rounded-xl text-sm font-medium border transition-colors ${
-                !isRecurring
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-200'
-              }`}>
-              One-off
-            </button>
-            <button type="button" onClick={() => setIsRecurring(true)}
-              className={`py-3 rounded-xl text-sm font-medium border transition-colors ${
-                isRecurring
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-200'
-              }`}>
-              Recurring
-            </button>
-          </div>
+        {/* Recurrence */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+          <h2 className="font-semibold text-gray-900 text-sm">Recurrence</h2>
+          <RecurrencePicker
+            startDate={startTime ? new Date(startTime) : new Date()}
+            onChange={(str, desc) => { setRruleStr(str); setRruleDesc(desc) }}
+          />
+          {isRecurring && (
+            <div className="bg-blue-50 rounded-xl px-3 py-2 text-xs text-blue-700">
+              {rruleDesc}
+            </div>
+          )}
         </div>
 
-        {/* One-off timing */}
-        {!isRecurring && (
+        {/* Timing */}
+        {!isRecurring ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
             <h2 className="font-semibold text-gray-900 text-sm">When</h2>
             <div>
@@ -333,36 +312,12 @@ export default function ClientNewActivityPage() {
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
-        )}
-
-        {/* Recurring pattern */}
-        {isRecurring && (
+        ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-            <h2 className="font-semibold text-gray-900 text-sm">Recurrence Pattern</h2>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-2">
-                Days <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-2 flex-wrap">
-                {DAYS.map((day, i) => (
-                  <button key={i} type="button" onClick={() => toggleDay(i)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-                      daysOfWeek.includes(i)
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-200'
-                    }`}>
-                    {day}
-                  </button>
-                ))}
-              </div>
-            </div>
-
+            <h2 className="font-semibold text-gray-900 text-sm">Shift Time</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                  Start Time <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Time</label>
                 <input type="time" value={recurTime} onChange={e => setRecurTime(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
@@ -374,32 +329,6 @@ export default function ClientNewActivityPage() {
                 </select>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                  Starting From <span className="text-red-500">*</span>
-                </label>
-                <input type="date" value={recurStart} onChange={e => setRecurStart(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                  Until <span className="text-gray-300 text-[10px]">(blank = ongoing)</span>
-                </label>
-                <input type="date" value={recurEnd} onChange={e => setRecurEnd(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-
-            {daysOfWeek.length > 0 && (
-              <div className="bg-blue-50 rounded-xl px-3 py-2.5 text-xs text-blue-700">
-                Will generate shifts every{' '}
-                {daysOfWeek.map(d => DAYS[d]).join(', ')} at{' '}
-                {recurTime} for {DURATIONS.find(d => d.value === durationMins)?.label || `${durationMins}min`}
-                {recurEnd ? ` until ${recurEnd}` : ' (ongoing)'}
-              </div>
-            )}
           </div>
         )}
 
@@ -409,19 +338,16 @@ export default function ClientNewActivityPage() {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Pickup Address</label>
             <input type="text" value={pickupAddress} onChange={e => setPickupAddress(e.target.value)}
-              placeholder="Where should the Worker pick you up?"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Venue / Activity Location</label>
             <input type="text" value={venueAddress} onChange={e => setVenueAddress(e.target.value)}
-              placeholder="Optional — where is the activity?"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Drop-off Address</label>
             <input type="text" value={dropoffAddress} onChange={e => setDropoffAddress(e.target.value)}
-              placeholder="Where should the Worker drop you off?"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>
@@ -432,11 +358,7 @@ export default function ClientNewActivityPage() {
 
         <button type="submit" disabled={saving}
           className="w-full bg-blue-600 text-white py-4 rounded-2xl text-sm font-semibold disabled:opacity-50 active:bg-blue-700 transition-colors">
-          {saving
-            ? 'Sending Request…'
-            : isRecurring
-              ? 'Create Recurring Schedule'
-              : 'Send Activity Request'}
+          {saving ? 'Sending Request…' : isRecurring ? 'Create Recurring Schedule' : 'Send Activity Request'}
         </button>
       </form>
     </div>

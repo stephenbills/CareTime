@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email/resend'
 import * as templates from '@/lib/email/templates'
+import { requireUser } from '@/lib/api/auth'
 
 // Maps a notification "type" string to its template function.
 // The client calls this route with { type, to, data } and never touches Resend directly.
@@ -24,6 +25,13 @@ const TEMPLATE_MAP: Record<string, (data: any) => { subject: string; html: strin
 
 export async function POST(req: NextRequest) {
   try {
+    // SECURITY: only logged-in users (any role) may trigger notifications.
+    // Without this, the route is an open email relay.
+    const user = await requireUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { type, to, data } = body
 

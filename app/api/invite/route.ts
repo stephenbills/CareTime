@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEmail } from '@/lib/email/resend'
 import { welcomeEmail } from '@/lib/email/templates'
+import { requireProvider } from '@/lib/api/auth'
 
 const ROLE_TABLE: Record<string, string> = {
   worker: 'carers',
@@ -23,6 +24,12 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'
 
 export async function POST(req: NextRequest) {
   try {
+    // SECURITY: only a logged-in Provider or Administrator may send invites.
+    const caller = await requireProvider()
+    if (!caller) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { email, name, role, recordId } = await req.json()
     console.log('[/api/invite] Request:', { email, role, recordId })
 

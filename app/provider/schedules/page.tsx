@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, ChevronRight, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react'
 import Link from 'next/link'
+import { RRule } from 'rrule'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -53,54 +54,67 @@ export default function SchedulesPage() {
 
   async function generateActivities(schedule: any) {
     setGenerating(schedule.id)
-    // Generate 4 weeks of activities from today
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const until = new Date(today)
     until.setDate(until.getDate() + 28)
 
-    const validFrom = schedule.valid_from ? new Date(schedule.valid_from) : today
-    const validUntil = schedule.valid_until ? new Date(schedule.valid_until) : until
+    let dates: Date[] = []
 
-    const endDate = validUntil < until ? validUntil : until
-
-    const activities: any[] = []
-    const current = new Date(today > validFrom ? today : validFrom)
-
-    while (current <= endDate) {
-      const dow = current.getDay()
-      if (schedule.days_of_week.includes(dow)) {
-        const [sh, sm] = schedule.start_time.split(':').map(Number)
-        const start = new Date(current)
-        start.setHours(sh, sm, 0, 0)
-        const end = new Date(start)
-        end.setMinutes(end.getMinutes() + schedule.duration_minutes)
-
-        // Check if activity already exists for this date
-        const { data: existing } = await supabase.from('activities')
-          .select('id').eq('recurring_schedule_id', schedule.id)
-          .gte('start_time', start.toISOString())
-          .lte('start_time', new Date(start.getTime() + 60000).toISOString())
-
-        if (!existing || existing.length === 0) {
-          activities.push({
-            recurring_schedule_id: schedule.id,
-            provider_id: schedule.provider_id,
-            client_id: schedule.client_id,
-            carer_id: schedule.carer_id || null,
-            ndis_line_item_id: schedule.ndis_line_item_id || null,
-            title: schedule.title,
-            description: schedule.description || null,
-            status: schedule.carer_id ? 'awaiting_acceptance' : 'awaiting_acceptance',
-            start_time: start.toISOString(),
-            end_time: end.toISOString(),
-            pickup_address: schedule.pickup_address || null,
-            dropoff_address: schedule.dropoff_address || null,
-            venue_address: schedule.venue_address || null,
-          })
+    if (schedule.rrule) {
+      // Use rrule to generate occurrences
+      const rule = RRule.fromString(schedule.rrule)
+      const validUntil = schedule.valid_until ? new Date(schedule.valid_until) : until
+      const endDate = validUntil < until ? validUntil : until
+      const validFrom = schedule.valid_from ? new Date(schedule.valid_from) : today
+      const startDate = today > validFrom ? today : validFrom
+      dates = rule.between(startDate, endDate, true)
+    } else if (schedule.days_of_week) {
+      // Legacy: use days_of_week array
+      const validFrom = schedule.valid_from ? new Date(schedule.valid_from) : today
+      const validUntil = schedule.valid_until ? new Date(schedule.valid_until) : until
+      const endDate = validUntil < until ? validUntil : until
+      const current = new Date(today > validFrom ? today : validFrom)
+      while (current <= endDate) {
+        if (schedule.days_of_week.includes(current.getDay())) {
+          dates.push(new Date(current))
         }
+        current.setDate(current.getDate() + 1)
       }
-      current.setDate(current.getDate() + 1)
+    }
+
+    const [sh, sm] = (schedule.start_time || '09:00').split(':').map(Number)
+    const activities: any[] = []
+
+    for (const d of dates) {
+      const start = new Date(d)
+      start.setHours(sh, sm, 0, 0)
+      const end = new Date(start)
+      end.setMinutes(end.getMinutes() + schedule.duration_minutes)
+
+      // Check if activity already exists for this date/time
+      const { data: existing } = await supabase.from('activities')
+        .select('id').eq('recurring_schedule_id', schedule.id)
+        .gte('start_time', start.toISOString())
+        .lte('start_time', new Date(start.getTime() + 60000).toISOString())
+
+      if (!existing || existing.length === 0) {
+        activities.push({
+          recurring_schedule_id: schedule.id,
+          provider_id: schedule.provider_id,
+          client_id: schedule.client_id,
+          carer_id: schedule.carer_id || null,
+          ndis_line_item_id: schedule.ndis_line_item_id || null,
+          title: schedule.title,
+          description: schedule.description || null,
+          status: 'awaiting_acceptance',
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          pickup_address: schedule.pickup_address || null,
+          dropoff_address: schedule.dropoff_address || null,
+          venue_address: schedule.venue_address || null,
+        })
+      }
     }
 
     if (activities.length > 0) {
@@ -158,7 +172,9 @@ export default function SchedulesPage() {
                     <span>{clients[s.client_id] || '—'}</span>
                     {s.carer_id && <span>Worker: {workers[s.carer_id] || '—'}</span>}
                     <span className="text-blue-600 font-medium">
-                      {(s.days_of_week as number[]).sort().map(d => DAYS[d]).join(', ')}
+                      {s.rrule
+                        ? (() => { try { return RRule.fromString(s.rrule).toText() } catch { return '—' } })()
+                        : (s.days_of_week as number[])?.sort().map(d => DAYS[d]).join(', ') || '—'}
                     </span>
                     <span>{formatTime(s.start_time)} · {formatDuration(s.duration_minutes)}</span>
                     <span>From {formatDate(s.valid_from)}{s.valid_until ? ` to ${formatDate(s.valid_until)}` : ' (ongoing)'}</span>

@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import RecurrencePicker from '@/components/RecurrencePicker'
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DURATIONS = [
   { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
   { label: '1.5 hours', value: 90 }, { label: '2 hours', value: 120 },
@@ -54,7 +54,8 @@ export default function ScheduleFormPage() {
   const [clientId, setClientId] = useState('')
   const [carerId, setCarerId] = useState('')
   const [ndisItemId, setNdisItemId] = useState('')
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([])
+  const [rruleStr, setRruleStr] = useState<string | null>(null)
+  const [rruleDesc, setRruleDesc] = useState('Does not repeat')
   const [startTime, setStartTime] = useState('09:00')
   const [durationMins, setDurationMins] = useState(120)
   const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10))
@@ -62,6 +63,7 @@ export default function ScheduleFormPage() {
   const [pickupAddress, setPickupAddress] = useState('')
   const [dropoffAddress, setDropoffAddress] = useState('')
   const [venueAddress, setVenueAddress] = useState('')
+  const [initialRRule, setInitialRRule] = useState<string | null>(null)
 
   const [clients, setClients] = useState<any[]>([])
   const [workers, setWorkers] = useState<any[]>([])
@@ -89,7 +91,6 @@ export default function ScheduleFormPage() {
           setClientId(s.client_id || '')
           setCarerId(s.carer_id || '')
           setNdisItemId(s.ndis_line_item_id || '')
-          setDaysOfWeek(s.days_of_week || [])
           setStartTime(s.start_time?.slice(0, 5) || '09:00')
           setDurationMins(s.duration_minutes || 120)
           setValidFrom(s.valid_from || '')
@@ -97,6 +98,10 @@ export default function ScheduleFormPage() {
           setPickupAddress(s.pickup_address || '')
           setDropoffAddress(s.dropoff_address || '')
           setVenueAddress(s.venue_address || '')
+          if (s.rrule) {
+            setRruleStr(s.rrule)
+            setInitialRRule(s.rrule)
+          }
         }
       }
       setLoading(false)
@@ -104,7 +109,6 @@ export default function ScheduleFormPage() {
     load()
   }, [id])
 
-  // When client changes, auto-fill address
   function handleClientChange(cid: string) {
     setClientId(cid)
     const client = clients.find(c => c.id === cid)
@@ -115,18 +119,12 @@ export default function ScheduleFormPage() {
     }
   }
 
-  function toggleDay(day: number) {
-    setDaysOfWeek(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
-    )
-  }
-
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (!title.trim()) { setError('Title is required'); return }
     if (!clientId) { setError('Client is required'); return }
-    if (daysOfWeek.length === 0) { setError('Select at least one day'); return }
+    if (!rruleStr) { setError('Set a recurrence pattern'); return }
     if (!validFrom) { setError('Start date is required'); return }
 
     setSaving(true)
@@ -142,7 +140,8 @@ export default function ScheduleFormPage() {
       client_id: clientId,
       carer_id: carerId || null,
       ndis_line_item_id: ndisItemId || null,
-      days_of_week: daysOfWeek,
+      rrule: rruleStr,
+      days_of_week: null as number[] | null,
       start_time: startTime,
       duration_minutes: durationMins,
       valid_from: validFrom,
@@ -169,7 +168,6 @@ export default function ScheduleFormPage() {
   const clientOptions = clients.map(c => ({ value: c.id, label: c.name }))
   const workerOptions = workers.map(c => ({ value: c.id, label: c.name }))
   const ndisOptions = ndisItems.map(n => ({ value: n.id, label: `${n.line_item_number} — ${n.description}` }))
-  const durationOptions = DURATIONS.map(d => ({ value: String(d.value), label: d.label }))
 
   return (
     <div className="p-8 max-w-3xl">
@@ -189,7 +187,7 @@ export default function ScheduleFormPage() {
 
       <form onSubmit={handleSave} className="space-y-6">
 
-        {/* Basic details */}
+        {/* Details */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Schedule Details</h2>
           <Field label="Title" value={title} onChange={setTitle} required placeholder="e.g. Tuesday Morning Support" />
@@ -204,28 +202,24 @@ export default function ScheduleFormPage() {
           </div>
         </div>
 
-        {/* Recurrence pattern */}
+        {/* Recurrence */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Recurrence Pattern</h2>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Days of Week <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {DAYS.map((day, i) => (
-                <button key={i} type="button" onClick={() => toggleDay(i)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                    daysOfWeek.includes(i)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                  }`}>
-                  {day}
-                </button>
-              ))}
+          <RecurrencePicker
+            startDate={validFrom ? new Date(validFrom) : new Date()}
+            onChange={(str, desc) => { setRruleStr(str); setRruleDesc(desc) }}
+            initialRRule={initialRRule}
+          />
+          {rruleStr && (
+            <div className="bg-blue-50 rounded-lg px-3 py-2 text-sm text-blue-700">
+              {rruleDesc}
             </div>
-          </div>
+          )}
+        </div>
 
+        {/* Shift time */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900">Shift Time</h2>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Start Time" value={startTime} onChange={setStartTime} type="time" required />
             <div>
@@ -236,10 +230,9 @@ export default function ScheduleFormPage() {
               </select>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Start Date" value={validFrom} onChange={setValidFrom} type="date" required />
-            <Field label="End Date (leave blank for ongoing)" value={validUntil} onChange={setValidUntil} type="date" />
+            <Field label="Schedule Start Date" value={validFrom} onChange={setValidFrom} type="date" required />
+            <Field label="End Date (blank = ongoing)" value={validUntil} onChange={setValidUntil} type="date" />
           </div>
         </div>
 
