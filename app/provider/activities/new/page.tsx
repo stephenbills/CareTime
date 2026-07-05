@@ -184,7 +184,13 @@ export default function ActivityPage() {
     const payload = {
       title: data.title,
       description: data.description || null,
-      status: data.status,
+      // If no worker assigned, use awaiting_acceptance so Provider dashboard shows it as unassigned
+      // If worker assigned, use awaiting_acceptance so Worker can accept
+      status: data.status !== 'awaiting_acceptance'
+        ? data.status
+        : data.carer_id
+          ? 'awaiting_acceptance'
+          : 'awaiting_acceptance',
       start_time: new Date(data.start_time).toISOString(),
       end_time: new Date(data.end_time).toISOString(),
       pickup_address: data.pickup_address || null,
@@ -328,7 +334,7 @@ export default function ActivityPage() {
             <Field label="Activity Title" value={data.title} onChange={v => set('title', v)} required />
             <Select label="Client" value={data.client_id} onChange={handleClientChange}
               options={clientOptions} required half />
-            <Select label="Worker (Optional)" value={data.carer_id} onChange={v => set('carer_id', v)}
+            <Select label="Worker (optional — assign later if unknown)" value={data.carer_id} onChange={v => set('carer_id', v)}
               options={carerOptions} half />
             <Select label="NDIS Line Item" value={data.ndis_line_item_id}
               onChange={v => set('ndis_line_item_id', v)} options={ndisOptions} />
