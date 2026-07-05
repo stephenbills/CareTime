@@ -4,6 +4,105 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 23 — 5 July 2026
+
+### Dashboard Navigation & Billing Rates Research
+
+#### Dashboard stat cards now clickable
+- Active Clients → `/provider/clients`
+- Active Workers → `/provider/carers`
+- Activities This Month → `/provider/calendar`
+- Awaiting Client Approval → `/provider/reports`
+
+---
+
+## Session 22 — 3 July 2026
+
+### Week View, Overnight Shifts & Calendar Improvements
+
+#### Week view — 24 hours
+All 24 hours now shown in the week grid (midnight to midnight). Hour labels on left axis for every hour. Grid lines at 6-hour intervals for orientation.
+
+#### Week view — Worker name after Client name
+Provider week view shows "Client · Worker" (first names). Worker week view shows Client name. Client week view shows Worker name.
+
+#### Week view — overnight shifts
+Shifts spanning midnight now appear in both day columns — running to midnight on the start day and from midnight on the next day.
+
+#### Back button preserves week/month view
+Selected view stored in URL (`?view=week`). Navigating to an activity and pressing back restores the exact view.
+
+#### Approve for Payment — returns to previous page
+After clicking Approve for Payment, `router.back()` returns to wherever the Provider came from.
+
+---
+
+## Session 21 — 3 July 2026
+
+### Invite Status, Payment Approval & Unassigned Activities
+
+#### Workers and Clients list pages
+- Green "Invited" badge for users with login accounts
+- Blue "Invite" button for uninvited users — sends invite directly from list
+- Amber banner showing count of uninvited active users
+
+#### Provider activity detail — Approve for Payment
+Prominent indigo action panel when status is `awaiting_payment_approval`. One-click approval moves to Ready for Payment and notifies Worker.
+
+#### Provider activity detail — Assign Worker panel
+Amber panel appears on activities with no Worker assigned. Dropdown to assign immediately and notify Worker without scrolling to the form.
+
+#### Provider dashboard rebuilt
+- Clickable stat cards linking to relevant screens
+- Unassigned Activities panel — lists activities needing a Worker
+- Awaiting Payment Approval panel — shifts Client-approved but not yet Provider-processed
+- Alert banners at top when either condition exists
+
+---
+
+## Session 20 — 3 July 2026
+
+### Client Interface — Activity Request, Notes, Week Calendar
+
+#### Client activity request (`/client/activities/new`)
+- "Request" button in calendar header
+- Pre-fills pickup/drop-off from Client's address record
+- Notifies Provider on submit
+
+#### Shift notes history (`/client/notes`)
+- New Notes tab in Client bottom nav
+- All Worker comments from completed shifts, descending date order
+- Shows Worker name, date, start/end times, comment, Client rating
+
+#### Client calendar — week view
+- Month/Week toggle
+- Week view uses shared WeekView component
+- Shows Worker name in activity blocks
+
+#### Client comments in approval email
+- Star rating shown as ★★★★☆
+- Client comments included in email to Worker and Provider
+
+---
+
+## Session 19 — 2 July 2026
+
+### Client Role — Full Interface Built
+
+#### Client interface at `/client/...`
+- **Dashboard** — pending approvals shown prominently in orange, upcoming activities
+- **Activity detail** — approve/reject with 1–5 star rating (required), optional comments, rejection reason
+- **Calendar** — Client's own activities only, dot indicators, orange for needs approval
+
+#### Email links by role
+- Worker emails → `/worker/activities/[id]`
+- Client emails → `/client/activities/[id]`
+
+#### `/carer/` routes renamed to `/worker/`
+All URL paths, navigation, email links, and auth routing use `/worker/` consistently.
+
+---
+
 ## Session 12 — 1 July 2026
 
 ### User Invitation & Role-Based Login

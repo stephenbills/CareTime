@@ -64,10 +64,10 @@ export default async function DashboardPage() {
   const workerMap: Record<string, string> = Object.fromEntries((workers || []).map((w: any) => [w.id, w.name]))
 
   const cards = [
-    { label: 'Active Clients', value: stats.clients, icon: Users, color: 'bg-blue-500' },
-    { label: 'Active Workers', value: stats.workers, icon: UserCheck, color: 'bg-green-500' },
-    { label: 'Activities This Month', value: stats.activities, icon: Activity, color: 'bg-purple-500' },
-    { label: 'Awaiting Client Approval', value: stats.pending, icon: Clock, color: 'bg-amber-500' },
+    { label: 'Active Clients', value: stats.clients, icon: Users, color: 'bg-blue-500', href: '/provider/clients' },
+    { label: 'Active Workers', value: stats.workers, icon: UserCheck, color: 'bg-green-500', href: '/provider/carers' },
+    { label: 'Activities This Month', value: stats.activities, icon: Activity, color: 'bg-purple-500', href: '/provider/calendar' },
+    { label: 'Awaiting Client Approval', value: stats.pending, icon: Clock, color: 'bg-amber-500', href: '/provider/reports' },
   ]
 
   return (
@@ -118,8 +118,9 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        {cards.map(({ label, value, icon: Icon, color, href }) => (
+          <Link key={label} href={href}
+            className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-blue-200 hover:shadow-md transition-all">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-500">{label}</span>
               <div className={`${color} w-9 h-9 rounded-lg flex items-center justify-center`}>
@@ -127,7 +128,7 @@ export default async function DashboardPage() {
               </div>
             </div>
             <p className="text-3xl font-bold text-gray-900">{value}</p>
-          </div>
+          </Link>
         ))}
       </div>
 
