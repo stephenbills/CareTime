@@ -10,9 +10,28 @@ const DURATIONS = [
   { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
   { label: '1.5 hours', value: 90 }, { label: '2 hours', value: 120 },
   { label: '2.5 hours', value: 150 }, { label: '3 hours', value: 180 },
-  { label: '4 hours', value: 240 }, { label: '5 hours', value: 300 },
-  { label: '6 hours', value: 360 }, { label: '8 hours', value: 480 },
+  { label: '3.5 hours', value: 210 }, { label: '4 hours', value: 240 },
+  { label: '4.5 hours', value: 270 }, { label: '5 hours', value: 300 },
+  { label: '5.5 hours', value: 330 }, { label: '6 hours', value: 360 },
+  { label: '6.5 hours', value: 390 }, { label: '7 hours', value: 420 },
+  { label: '7.5 hours', value: 450 }, { label: '8 hours', value: 480 },
+  { label: '10 hours', value: 600 }, { label: '12 hours', value: 720 },
 ]
+
+function timeOptions() {
+  const opts = []
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const val = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
+      const ampm = h < 12 ? 'AM' : 'PM'
+      const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+      const label = `${hour12}:${String(m).padStart(2,'0')} ${ampm}`
+      opts.push({ value: val, label })
+    }
+  }
+  return opts
+}
+const TIME_OPTS = timeOptions()
 
 function Field({ label, value, onChange, type = 'text', required = false, placeholder = '' }: any) {
   return (
@@ -221,7 +240,13 @@ export default function ScheduleFormPage() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">Shift Time</h2>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Start Time" value={startTime} onChange={setStartTime} type="time" required />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Time <span className="text-red-500">*</span></label>
+              <select value={startTime} onChange={e => setStartTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                {TIME_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Duration <span className="text-red-500">*</span></label>
               <select value={String(durationMins)} onChange={e => setDurationMins(Number(e.target.value))}
