@@ -201,7 +201,9 @@ export default function GenerateInvoicesPage() {
             const totalHours = acts.reduce((sum, a) => {
               const s = new Date(a.actual_start_time || a.start_time)
               const e = new Date(a.actual_end_time || a.end_time)
-              return sum + (e.getTime() - s.getTime()) / 3600000
+              let ms = e.getTime() - s.getTime()
+              if (ms <= 0) ms += 24 * 60 * 60 * 1000
+              return sum + ms / 3600000
             }, 0)
 
             return (
@@ -225,7 +227,9 @@ export default function GenerateInvoicesPage() {
                     {acts.map((a: any) => {
                       const s = new Date(a.actual_start_time || a.start_time)
                       const e = new Date(a.actual_end_time || a.end_time)
-                      const hrs = ((e.getTime() - s.getTime()) / 3600000).toFixed(1)
+                      let ms = e.getTime() - s.getTime()
+                      if (ms <= 0) ms += 24 * 60 * 60 * 1000
+                      const hrs = (ms / 3600000).toFixed(1)
                       const ndis = a.ndis_line_items as any
                       return (
                         <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">

@@ -72,7 +72,10 @@ export async function POST(req: NextRequest) {
       for (const act of acts) {
         const start = new Date(act.actual_start_time || act.start_time)
         const end = new Date(act.actual_end_time || act.end_time)
-        const durationHours = Math.round((end.getTime() - start.getTime()) / 36000) / 100
+        // Handle overnight shifts: if end <= start, the shift crosses midnight
+        let durationMs = end.getTime() - start.getTime()
+        if (durationMs <= 0) durationMs += 24 * 60 * 60 * 1000 // add 24 hours
+        const durationHours = Math.round(durationMs / 3600000 * 100) / 100
 
         const ndis = act.ndis_line_items as any
         const unitPrice = ndis?.unit_price || 0
