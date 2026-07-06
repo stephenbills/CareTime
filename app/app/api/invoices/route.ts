@@ -70,17 +70,35 @@ export async function POST(req: NextRequest) {
       const lineItems: any[] = []
 
       for (const act of acts) {
-        const start = new Date(act.actual_start_time || act.start_time)
-        const end = new Date(act.actual_end_time || act.end_time)
-        // Handle overnight shifts: if end <= start, the shift crosses midnight
+        const startStr = act.actual_start_time || act.start_time
+        const endStr = act.actual_end_time || act.end_time
+        const start = new Date(startStr)
+        const end = new Date(endStr)
+
+        console.log(`[/api/invoices] Activity "${act.title}":`)
+        console.log(`  start_time=${act.start_time}, actual_start=${act.actual_start_time}, using=${startStr}`)
+        console.log(`  end_time=${act.end_time}, actual_end=${act.actual_end_time}, using=${endStr}`)
+        console.log(`  parsed: start=${start.toISOString()}, end=${end.toISOString()}`)
+
         let durationMs = end.getTime() - start.getTime()
-        console.log(`[/api/invoices] Activity "${act.title}": start=${start.toISOString()} end=${end.toISOString()} rawMs=${durationMs}`)
-        if (durationMs <= 0) {
-          durationMs += 24 * 60 * 60 * 1000 // add 24 hours
-          console.log(`[/api/invoices] Overnight correction applied, adjustedMs=${durationMs}`)
+        console.log(`  rawMs=${durationMs} (${(durationMs/3600000).toFixed(2)}h)`)
+
+        if (isNaN(durationMs) || durationMs <= 0) {
+          durationMs = Math.abs(durationMs) || 0
+          if (durationMs === 0 || durationMs > 24 * 60 * 60 * 1000) {
+            // Fallback: calculate from start_time/end_time if actual times are bad
+            const fallbackStart = new Date(act.start_time)
+            const fallbackEnd = new Date(act.end_time)
+            durationMs = fallbackEnd.getTime() - fallbackStart.getTime()
+            if (durationMs <= 0) durationMs += 24 * 60 * 60 * 1000
+            console.log(`  Used fallback start_time/end_time, durationMs=${durationMs}`)
+          } else {
+            console.log(`  Overnight correction: used absolute value, durationMs=${durationMs}`)
+          }
         }
+
         const durationHours = Math.round(durationMs / 3600000 * 100) / 100
-        console.log(`[/api/invoices] Duration: ${durationHours}h`)
+        console.log(`  Final duration: ${durationHours}h`)
 
         const ndis = act.ndis_line_items as any
         const unitPrice = ndis?.unit_price || 0
