@@ -229,7 +229,7 @@ export default function ActivityPage() {
           })
         }
 
-        router.push('/provider/calendar')
+        router.back()
       }
     } else {
       const { data: existing } = await supabase
@@ -315,9 +315,9 @@ export default function ActivityPage() {
   return (
     <div className="p-8 max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/provider/calendar" className="text-gray-400 hover:text-gray-600 transition-colors">
+        <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600 transition-colors">
           <ArrowLeft size={18} />
-        </Link>
+        </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             {isNew ? 'Add Activity' : data.title || 'Activity Details'}
@@ -378,7 +378,7 @@ export default function ActivityPage() {
           </div>
         )}
 
-        <SaveBar saving={saving} saved={saved} onCancel={() => router.push('/provider/calendar')} />
+        <SaveBar saving={saving} saved={saved} onCancel={() => router.back()} />
       </form>
     </div>
   )
