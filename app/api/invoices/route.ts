@@ -70,12 +70,35 @@ export async function POST(req: NextRequest) {
       const lineItems: any[] = []
 
       for (const act of acts) {
-        const start = new Date(act.actual_start_time || act.start_time)
-        const end = new Date(act.actual_end_time || act.end_time)
-        // Handle overnight shifts: if end <= start, the shift crosses midnight
+        const startStr = act.actual_start_time || act.start_time
+        const endStr = act.actual_end_time || act.end_time
+        const start = new Date(startStr)
+        const end = new Date(endStr)
+
+        console.log(`[/api/invoices] Activity "${act.title}":`)
+        console.log(`  start_time=${act.start_time}, actual_start=${act.actual_start_time}, using=${startStr}`)
+        console.log(`  end_time=${act.end_time}, actual_end=${act.actual_end_time}, using=${endStr}`)
+        console.log(`  parsed: start=${start.toISOString()}, end=${end.toISOString()}`)
+
         let durationMs = end.getTime() - start.getTime()
-        if (durationMs <= 0) durationMs += 24 * 60 * 60 * 1000 // add 24 hours
+        console.log(`  rawMs=${durationMs} (${(durationMs/3600000).toFixed(2)}h)`)
+
+        if (isNaN(durationMs) || durationMs <= 0) {
+          durationMs = Math.abs(durationMs) || 0
+          if (durationMs === 0 || durationMs > 24 * 60 * 60 * 1000) {
+            // Fallback: calculate from start_time/end_time if actual times are bad
+            const fallbackStart = new Date(act.start_time)
+            const fallbackEnd = new Date(act.end_time)
+            durationMs = fallbackEnd.getTime() - fallbackStart.getTime()
+            if (durationMs <= 0) durationMs += 24 * 60 * 60 * 1000
+            console.log(`  Used fallback start_time/end_time, durationMs=${durationMs}`)
+          } else {
+            console.log(`  Overnight correction: used absolute value, durationMs=${durationMs}`)
+          }
+        }
+
         const durationHours = Math.round(durationMs / 3600000 * 100) / 100
+        console.log(`  Final duration: ${durationHours}h`)
 
         const ndis = act.ndis_line_items as any
         const unitPrice = ndis?.unit_price || 0
@@ -109,6 +132,8 @@ export async function POST(req: NextRequest) {
         })
       }
 
+      console.log(`[/api/invoices] Client ${cid}: ${acts.length} activities, ${Math.round(totalHours*100)/100}h, $${Math.round(totalAmount*100)/100} charge, $${Math.round(totalWorkerCost*100)/100} worker cost`)
+
       // Create invoice
       const { data: invoice, error: invErr } = await admin.from('invoices').insert({
         invoice_number: invoiceNumber,
@@ -124,9 +149,10 @@ export async function POST(req: NextRequest) {
       }).select().single()
 
       if (invErr) {
-        console.error('[/api/invoices] Create invoice error:', invErr.message)
+        console.error('[/api/invoices] Create invoice error:', JSON.stringify(invErr))
         continue
       }
+      console.log(`[/api/invoices] Created invoice ${invoice.invoice_number} id=${invoice.id}`)
 
       // Create line items
       const itemsWithInvoice = lineItems.map(li => ({ ...li, invoice_id: invoice.id }))

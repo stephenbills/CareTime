@@ -13,6 +13,21 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
+function calcDurationHours(act: any) {
+  // Use actual times if set, otherwise scheduled times
+  const startStr = act.actual_start_time || act.start_time
+  const endStr = act.actual_end_time || act.end_time
+  if (!startStr || !endStr) return 0
+  const s = new Date(startStr)
+  const e = new Date(endStr)
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0
+  let ms = e.getTime() - s.getTime()
+  // Handle overnight: if end is before start, add 24 hours
+  if (ms <= 0) ms += 24 * 60 * 60 * 1000
+  return ms / 3600000
+}
+
+
 function lastMonthRange() {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
@@ -147,7 +162,7 @@ export default function GenerateInvoicesPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Generate Invoices</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Create invoices from approved activities</p>
+          <p className="text-gray-500 text-sm mt-0.5">Create invoices from approved activities <span className="text-gray-300 text-xs">v2</span></p>
         </div>
       </div>
 
@@ -198,13 +213,7 @@ export default function GenerateInvoicesPage() {
           </div>
 
           {Object.entries(previewByClient).map(([cid, { name, acts }]) => {
-            const totalHours = acts.reduce((sum, a) => {
-              const s = new Date(a.actual_start_time || a.start_time)
-              const e = new Date(a.actual_end_time || a.end_time)
-              let ms = e.getTime() - s.getTime()
-              if (ms <= 0) ms += 24 * 60 * 60 * 1000
-              return sum + ms / 3600000
-            }, 0)
+            const totalHours = acts.reduce((sum, a) => sum + calcDurationHours(a), 0)
 
             return (
               <div key={cid} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -225,11 +234,7 @@ export default function GenerateInvoicesPage() {
                   </thead>
                   <tbody>
                     {acts.map((a: any) => {
-                      const s = new Date(a.actual_start_time || a.start_time)
-                      const e = new Date(a.actual_end_time || a.end_time)
-                      let ms = e.getTime() - s.getTime()
-                      if (ms <= 0) ms += 24 * 60 * 60 * 1000
-                      const hrs = (ms / 3600000).toFixed(1)
+                      const hrs = calcDurationHours(a).toFixed(1)
                       const ndis = a.ndis_line_items as any
                       return (
                         <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50">
@@ -238,6 +243,11 @@ export default function GenerateInvoicesPage() {
                           <td className="py-2 px-4 text-gray-600">{(a.carers as any)?.name || '—'}</td>
                           <td className="py-2 px-4 text-gray-500 text-xs">
                             {formatTime(a.start_time)} – {formatTime(a.end_time)}
+                            {a.actual_start_time && (
+                              <span className="block text-[10px] text-orange-400">
+                                actual: {formatTime(a.actual_start_time)} – {formatTime(a.actual_end_time || a.end_time)}
+                              </span>
+                            )}
                           </td>
                           <td className="py-2 px-4 text-gray-500 text-xs truncate max-w-[160px]">
                             {ndis ? `${ndis.line_item_number}` : '—'}
