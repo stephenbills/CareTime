@@ -4,7 +4,7 @@ All notable changes to CareTime are documented here.
 
 ---
 
-# Session 23 — 5 July 2026
+## Session 23 — 5 July 2026
 
 ### Dashboard Navigation & Billing Rates Research
 
