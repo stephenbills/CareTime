@@ -22,15 +22,16 @@ export default function ClientNotesPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: client } = await supabase
-        .from('clients').select('id').eq('user_id', user.id).maybeSingle()
-      if (!client) { setLoading(false); return }
+      const { data: clientRecords } = await supabase
+        .from('clients').select('id').eq('user_id', user.id)
+      if (!clientRecords || clientRecords.length === 0) { setLoading(false); return }
+      const clientIds = clientRecords.map(c => c.id)
 
       // Get all completed activities with worker comments
       const { data: acts } = await supabase
         .from('activities')
         .select('*, carers(name)')
-        .eq('client_id', client.id)
+        .in('client_id', clientIds)
         .not('carer_comments', 'is', null)
         .in('status', ['awaiting_client_approval', 'awaiting_payment_approval', 'ready_for_payment', 'paid'])
         .order('actual_start_time', { ascending: false })

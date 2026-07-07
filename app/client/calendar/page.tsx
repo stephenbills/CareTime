@@ -50,28 +50,29 @@ function ClientCalendarInner() {
   const [activities, setActivities] = useState<any[]>([])
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
   const [workers, setWorkers] = useState<Record<string, string>>({})
-  const [clientId, setClientId] = useState<string | null>(null)
+  const [clientIds, setClientIds] = useState<string[]>([])
   const supabase = createClient()
 
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: client } = await supabase
-        .from('clients').select('id').eq('user_id', user.id).maybeSingle()
-      if (!client) return
-      setClientId(client.id)
-      loadActivities(client.id, year, month)
+      const { data: clientRecords } = await supabase
+        .from('clients').select('id').eq('user_id', user.id)
+      if (!clientRecords || clientRecords.length === 0) return
+      const ids = clientRecords.map(c => c.id)
+      setClientIds(ids)
+      loadActivities(ids, year, month)
     }
     init()
   }, [])
 
-  async function loadActivities(cid: string, y: number, m: number) {
+  async function loadActivities(cids: string[], y: number, m: number) {
     const from = new Date(y, m - 1, 1).toISOString()
     const to = new Date(y, m + 2, 0, 23, 59, 59).toISOString()
     const [{ data: acts }, { data: wks }] = await Promise.all([
       supabase.from('activities').select('*')
-        .eq('client_id', cid).gte('start_time', from).lte('start_time', to).order('start_time'),
+        .in('client_id', cids).gte('start_time', from).lte('start_time', to).order('start_time'),
       supabase.from('carers').select('id, name'),
     ])
     setActivities(acts || [])
@@ -82,13 +83,13 @@ function ClientCalendarInner() {
     const nm = month === 0 ? 11 : month - 1
     const ny = month === 0 ? year - 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
-    if (clientId) loadActivities(clientId, ny, nm)
+    if (clientIds.length) loadActivities(clientIds, ny, nm)
   }
   function nextMonth() {
     const nm = month === 11 ? 0 : month + 1
     const ny = month === 11 ? year + 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
-    if (clientId) loadActivities(clientId, ny, nm)
+    if (clientIds.length) loadActivities(clientIds, ny, nm)
   }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate()

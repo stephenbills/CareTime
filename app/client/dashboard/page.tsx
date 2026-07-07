@@ -52,10 +52,12 @@ export default function ClientDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: clientData } = await supabase
-        .from('clients').select('*').eq('user_id', user.id).maybeSingle()
-      setClient(clientData)
-      if (!clientData) { setLoading(false); return }
+      // Get ALL client records for this user (may be linked to multiple providers)
+      const { data: clientRecords } = await supabase
+        .from('clients').select('*').eq('user_id', user.id)
+      if (!clientRecords || clientRecords.length === 0) { setClient(null); setLoading(false); return }
+      setClient(clientRecords[0]) // Use first record for display name
+      const clientIds = clientRecords.map(c => c.id)
 
       const now = new Date()
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
@@ -63,11 +65,11 @@ export default function ClientDashboard() {
 
       const [{ data: pending }, { data: future }, { data: wks }] = await Promise.all([
         supabase.from('activities').select('*')
-          .eq('client_id', clientData.id)
+          .in('client_id', clientIds)
           .eq('status', 'awaiting_client_approval')
           .order('actual_end_time', { ascending: true }),
         supabase.from('activities').select('*')
-          .eq('client_id', clientData.id)
+          .in('client_id', clientIds)
           .in('status', ['awaiting_acceptance', 'scheduled', 'in_progress'])
           .gte('start_time', now.toISOString())
           .lte('start_time', futureEnd)

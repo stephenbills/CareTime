@@ -33,43 +33,71 @@ export default function NewCarerPage() {
     setSaving(true)
     setError('')
 
-    const payload = {
-      name: data.name, email: data.email || null, mobile: data.mobile || null,
-      home_phone: data.home_phone || null, work_phone: data.work_phone || null,
-      address_line1: data.address_line1 || null, suburb: data.suburb || null,
-      state: data.state || null, postcode: data.postcode || null,
-      car_registration: data.car_registration || null, abn: data.abn || null,
-      bank_bsb: data.bank_bsb || null, bank_account_number: data.bank_account_number || null,
-      comments: data.comments || null, active: true,
-      provider_id: providerId,
-    }
+    // Check if a worker with this email already exists
+    const { data: existing } = await supabase
+      .from('carers').select('id, name').eq('email', data.email.trim()).maybeSingle()
 
-    const { data: created, error: err } = await supabase
-      .from('carers').insert(payload).select().single()
-    if (err) { setError(err.message); setSaving(false); return }
+    let workerId: string
 
-    // Create junction table entry linking worker to this provider
-    if (providerId) {
+    if (existing) {
+      // Worker already exists — just link to this provider
+      workerId = existing.id
+
+      const { data: link } = await supabase
+        .from('provider_carers')
+        .select('id')
+        .eq('provider_id', providerId!)
+        .eq('carer_id', workerId)
+        .maybeSingle()
+
+      if (link) {
+        setError(`${existing.name} is already linked to your organisation`)
+        setSaving(false)
+        return
+      }
+
       await supabase.from('provider_carers').insert({
-        provider_id: providerId,
-        carer_id: created.id,
+        provider_id: providerId!,
+        carer_id: workerId,
         active: true,
+      })
+    } else {
+      // Create new worker record
+      const payload = {
+        name: data.name, email: data.email || null, mobile: data.mobile || null,
+        home_phone: data.home_phone || null, work_phone: data.work_phone || null,
+        address_line1: data.address_line1 || null, suburb: data.suburb || null,
+        state: data.state || null, postcode: data.postcode || null,
+        car_registration: data.car_registration || null, abn: data.abn || null,
+        bank_bsb: data.bank_bsb || null, bank_account_number: data.bank_account_number || null,
+        comments: data.comments || null, active: true,
+        provider_id: providerId,
+      }
+
+      const { data: created, error: err } = await supabase
+        .from('carers').insert(payload).select().single()
+      if (err) { setError(err.message); setSaving(false); return }
+
+      workerId = created.id
+
+      if (providerId) {
+        await supabase.from('provider_carers').insert({
+          provider_id: providerId,
+          carer_id: workerId,
+          active: true,
+        })
+      }
+
+      // Send invite for new workers only
+      await fetch('/api/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email, name: data.name, role: 'worker', recordId: workerId }),
       })
     }
 
-    // Send invite email
-    const inviteRes = await fetch('/api/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: data.email, name: data.name, role: 'worker', recordId: created.id }),
-    })
-    const inviteData = await inviteRes.json()
-    if (!inviteRes.ok) {
-      console.warn('Invite failed:', inviteData.error)
-    }
-
     setSaving(false)
-    router.push(`/provider/carers/${created.id}`)
+    router.push(`/provider/carers/${workerId}`)
   }
 
   return (

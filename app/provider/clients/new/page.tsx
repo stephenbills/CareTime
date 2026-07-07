@@ -35,37 +35,71 @@ export default function NewClientPage() {
     const { data: provider } = await supabase
       .from('providers').select('id').eq('user_id', user!.id).single()
 
-    const payload = {
-      name: data.name, email: data.email || null, phone: data.phone || null,
-      mobile: data.mobile || null, address_line1: data.address_line1 || null,
-      address_line2: data.address_line2 || null, suburb: data.suburb || null,
-      state: data.state || null, postcode: data.postcode || null,
-      ndis_number: data.ndis_number || null, comments: data.comments || null,
-      active: true, provider_id: provider?.id,
-    }
+    // Check if a client with this email already exists
+    const { data: existing } = await supabase
+      .from('clients').select('id, name').eq('email', data.email.trim()).maybeSingle()
 
-    const { data: created, error: err } = await supabase
-      .from('clients').insert(payload).select().single()
-    if (err) { setError(err.message); setSaving(false); return }
+    let clientId: string
 
-    // Create junction table entry linking client to this provider
-    if (provider?.id) {
+    if (existing) {
+      // Client already exists — just link to this provider
+      clientId = existing.id
+
+      // Check if already linked
+      const { data: link } = await supabase
+        .from('provider_clients')
+        .select('id')
+        .eq('provider_id', provider!.id)
+        .eq('client_id', clientId)
+        .maybeSingle()
+
+      if (link) {
+        setError(`${existing.name} is already linked to your organisation`)
+        setSaving(false)
+        return
+      }
+
       await supabase.from('provider_clients').insert({
-        provider_id: provider.id,
-        client_id: created.id,
+        provider_id: provider!.id,
+        client_id: clientId,
         active: true,
+      })
+    } else {
+      // Create new client record
+      const payload = {
+        name: data.name, email: data.email || null, phone: data.phone || null,
+        mobile: data.mobile || null, address_line1: data.address_line1 || null,
+        address_line2: data.address_line2 || null, suburb: data.suburb || null,
+        state: data.state || null, postcode: data.postcode || null,
+        ndis_number: data.ndis_number || null, comments: data.comments || null,
+        active: true, provider_id: provider?.id,
+      }
+
+      const { data: created, error: err } = await supabase
+        .from('clients').insert(payload).select().single()
+      if (err) { setError(err.message); setSaving(false); return }
+
+      clientId = created.id
+
+      // Create junction table entry
+      if (provider?.id) {
+        await supabase.from('provider_clients').insert({
+          provider_id: provider.id,
+          client_id: clientId,
+          active: true,
+        })
+      }
+
+      // Send invite for new clients only
+      await fetch('/api/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email, name: data.name, role: 'client', recordId: clientId }),
       })
     }
 
-    // Send invite
-    await fetch('/api/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: data.email, name: data.name, role: 'client', recordId: created.id }),
-    })
-
     setSaving(false)
-    router.push(`/provider/clients/${created.id}`)
+    router.push(`/provider/clients/${clientId}`)
   }
 
   return (
