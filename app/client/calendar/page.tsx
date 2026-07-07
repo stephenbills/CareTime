@@ -107,7 +107,7 @@ function ClientCalendarInner() {
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between pt-1">
         <h1 className="text-xl font-bold text-gray-900">My Calendar</h1>
-        <Link href="/client/activities/new"
+        <Link href={`/client/activities/new?date=${year}-${String(month+1).padStart(2,"0")}-${String(selectedDay || new Date().getDate()).padStart(2,"0")}`}
           className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-semibold">
           <Plus size={14} /> Request
         </Link>
@@ -167,7 +167,7 @@ function ClientCalendarInner() {
               {selectedActs.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
                   <p className="text-gray-400 text-sm">No activities on this day</p>
-                  <Link href="/client/activities/new" className="text-blue-600 text-xs mt-2 block">+ Request an activity</Link>
+                  <Link href={`/client/activities/new?date=${year}-${String(month+1).padStart(2,"0")}-${String(selectedDay).padStart(2,"0")}`} className="text-blue-600 text-xs mt-2 block">+ Request an activity</Link>
                 </div>
               ) : (
                 <div className="space-y-2">

@@ -36,6 +36,9 @@ export default function ClientActivityPage() {
   const [comments, setComments] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [showRejectForm, setShowRejectForm] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editData, setEditData] = useState({ title: '', description: '', start_time: '', end_time: '' })
+  const [deleting, setDeleting] = useState(false)
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
@@ -155,6 +158,44 @@ export default function ClientActivityPage() {
     setActing(false)
   }
 
+  function startEditing() {
+    setEditing(true)
+    setEditData({
+      title: activity.title || '',
+      description: activity.description || '',
+      start_time: activity.start_time?.slice(0, 16) || '',
+      end_time: activity.end_time?.slice(0, 16) || '',
+    })
+  }
+
+  async function handleSaveEdit() {
+    if (!editData.title.trim()) { setError('Title is required'); return }
+    setActing(true); setError('')
+    const { error: err } = await supabase.from('activities').update({
+      title: editData.title.trim(),
+      description: editData.description || null,
+      start_time: editData.start_time ? new Date(editData.start_time).toISOString() : undefined,
+      end_time: editData.end_time ? new Date(editData.end_time).toISOString() : undefined,
+    }).eq('id', id)
+    if (err) { setError(err.message); setActing(false); return }
+    setEditing(false)
+    await load()
+    setActing(false)
+  }
+
+  async function handleDelete() {
+    if (!confirm('Are you sure you want to delete this activity? This cannot be undone.')) return
+    setDeleting(true)
+    await supabase.from('activity_status_history').delete().eq('activity_id', id)
+    const { error: err } = await supabase.from('activities').delete().eq('id', id)
+    if (err) { setError(err.message); setDeleting(false); return }
+    router.push('/client/calendar')
+  }
+
+  const canEdit = activity && !['paid', 'in_progress'].includes(activity.status)
+  const canDelete = activity && ['awaiting_acceptance', 'scheduled'].includes(activity.status) &&
+    new Date(activity.start_time) > new Date()
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="text-gray-400 text-sm">Loading…</div>
@@ -171,11 +212,71 @@ export default function ClientActivityPage() {
   return (
     <div className="p-4 space-y-4 pb-8">
       <div className="flex items-center gap-3 pt-1">
-        <Link href="/client/dashboard" className="p-1 text-gray-400 hover:text-gray-600">
+        <button onClick={() => router.back()} className="p-1 text-gray-400 hover:text-gray-600">
           <ArrowLeft size={20} />
-        </Link>
-        <h1 className="text-lg font-bold text-gray-900 flex-1 leading-tight">{activity.title}</h1>
+        </button>
+        <h1 className="text-lg font-bold text-gray-900 flex-1 leading-tight">
+          {editing ? 'Edit Activity' : activity.title}
+        </h1>
+        <div className="flex gap-2">
+          {canEdit && !editing && (
+            <button onClick={startEditing}
+              className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors font-medium">
+              Edit
+            </button>
+          )}
+          {canDelete && !editing && (
+            <button onClick={handleDelete} disabled={deleting}
+              className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors font-medium disabled:opacity-50">
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Edit form */}
+      {editing && (
+        <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
+            <input type="text" value={editData.title}
+              onChange={e => setEditData(prev => ({ ...prev, title: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Description</label>
+            <textarea value={editData.description}
+              onChange={e => setEditData(prev => ({ ...prev, description: e.target.value }))}
+              rows={2}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Start</label>
+              <input type="datetime-local" value={editData.start_time}
+                onChange={e => setEditData(prev => ({ ...prev, start_time: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">End</label>
+              <input type="datetime-local" value={editData.end_time}
+                onChange={e => setEditData(prev => ({ ...prev, end_time: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-3 py-2">⚠ {error}</div>}
+          <div className="flex gap-2">
+            <button onClick={handleSaveEdit} disabled={acting}
+              className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50">
+              {acting ? 'Saving…' : 'Save Changes'}
+            </button>
+            <button onClick={() => { setEditing(false); setError('') }}
+              className="px-4 py-2.5 rounded-xl text-sm text-gray-600 hover:bg-gray-100">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Approval action */}
       {canApprove && !showRejectForm && (

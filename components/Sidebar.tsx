@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, UserCheck, Calendar,
-  FileText, BarChart2, Settings, LogOut, RefreshCw
+  FileText, BarChart2, Settings, LogOut, RefreshCw, ClipboardList
 } from 'lucide-react'
 
 const nav = [
@@ -13,6 +13,7 @@ const nav = [
   { label: 'Workers', href: '/provider/carers', icon: UserCheck },
   { label: 'Calendar', href: '/provider/calendar', icon: Calendar },
   { label: 'Schedules', href: '/provider/schedules', icon: RefreshCw },
+  { label: 'Status', href: '/provider/status', icon: ClipboardList },
   { label: 'Invoices', href: '/provider/invoices', icon: FileText },
   { label: 'Reports', href: '/provider/reports', icon: BarChart2 },
   { label: 'Settings', href: '/provider/settings', icon: Settings },

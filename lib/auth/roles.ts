@@ -6,16 +6,23 @@ export const ROLE_ROUTES: Record<string, string> = {
   provider: '/provider/dashboard',
   worker: '/worker/dashboard',
   client: '/client/dashboard',
-  nominee: '/client/dashboard',   // Nominees use Client interface for now
+  nominee: '/client/dashboard',
   administrator: '/admin',
 }
 
-// Determines the role of the currently logged-in user by checking all app tables.
-// Returns the role string, or null if no matching record is found.
-export async function detectUserRole(
+export const ROLE_LABELS: Record<string, string> = {
+  provider: 'Provider',
+  worker: 'Worker',
+  client: 'Client',
+  nominee: 'Nominee',
+  administrator: 'Administrator',
+}
+
+// Detects ALL roles for a user
+export async function detectAllRoles(
   supabase: SupabaseClient,
   userId: string
-): Promise<UserRole> {
+): Promise<UserRole[]> {
   const [
     { data: provider },
     { data: worker },
@@ -30,10 +37,20 @@ export async function detectUserRole(
     supabase.from('administrators').select('id').eq('user_id', userId).maybeSingle(),
   ])
 
-  if (provider) return 'provider'
-  if (worker) return 'worker'
-  if (client) return 'client'
-  if (nominee) return 'nominee'
-  if (admin) return 'administrator'
-  return null
+  const roles: UserRole[] = []
+  if (admin) roles.push('administrator')
+  if (provider) roles.push('provider')
+  if (worker) roles.push('worker')
+  if (client) roles.push('client')
+  if (nominee) roles.push('nominee')
+  return roles
+}
+
+// Returns the first role found (backwards compat)
+export async function detectUserRole(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<UserRole> {
+  const roles = await detectAllRoles(supabase, userId)
+  return roles.length > 0 ? roles[0] : null
 }

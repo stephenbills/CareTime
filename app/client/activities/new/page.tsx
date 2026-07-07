@@ -1,12 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
 import RecurrencePicker from '@/components/RecurrencePicker'
 import { RRule } from 'rrule'
+import { Suspense } from 'react'
 
 const DURATIONS = [
   { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
@@ -41,16 +42,19 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-export default function ClientNewActivityPage() {
+function ClientNewActivityInner() {
+  const searchParams = useSearchParams()
+  const dateParam = searchParams?.get('date')
+  const defaultDate = dateParam || todayStr()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [carerId, setCarerId] = useState('')
   const [ndisItemId, setNdisItemId] = useState('')
 
   // One-off timing — separate date and time fields
-  const [startDate, setStartDate] = useState(todayStr())
+  const [startDate, setStartDate] = useState(defaultDate)
   const [startTimeVal, setStartTimeVal] = useState('09:00')
-  const [endDate, setEndDate] = useState(todayStr())
+  const [endDate, setEndDate] = useState(defaultDate)
   const [endTimeVal, setEndTimeVal] = useState('11:00')
 
   // Recurrence
@@ -424,5 +428,13 @@ export default function ClientNewActivityPage() {
         </button>
       </form>
     </div>
+  )
+}
+
+export default function ClientNewActivityPage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-gray-400 text-sm">Loading…</div>}>
+      <ClientNewActivityInner />
+    </Suspense>
   )
 }
