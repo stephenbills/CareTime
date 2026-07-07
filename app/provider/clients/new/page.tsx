@@ -48,6 +48,15 @@ export default function NewClientPage() {
       .from('clients').insert(payload).select().single()
     if (err) { setError(err.message); setSaving(false); return }
 
+    // Create junction table entry linking client to this provider
+    if (provider?.id) {
+      await supabase.from('provider_clients').insert({
+        provider_id: provider.id,
+        client_id: created.id,
+        active: true,
+      })
+    }
+
     // Send invite
     await fetch('/api/invite', {
       method: 'POST',

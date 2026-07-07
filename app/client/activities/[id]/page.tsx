@@ -39,6 +39,7 @@ export default function ClientActivityPage() {
   const [editing, setEditing] = useState(false)
   const [editData, setEditData] = useState({ title: '', description: '', start_time: '', end_time: '' })
   const [deleting, setDeleting] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
@@ -184,11 +185,34 @@ export default function ClientActivityPage() {
   }
 
   async function handleDelete() {
+    if (activity.recurring_schedule_id) {
+      setShowDeleteModal(true)
+      return
+    }
     if (!confirm('Are you sure you want to delete this activity? This cannot be undone.')) return
+    await doDelete('single')
+  }
+
+  async function doDelete(mode: 'single' | 'future') {
     setDeleting(true)
-    await supabase.from('activity_status_history').delete().eq('activity_id', id)
-    const { error: err } = await supabase.from('activities').delete().eq('id', id)
-    if (err) { setError(err.message); setDeleting(false); return }
+    if (mode === 'future' && activity.recurring_schedule_id) {
+      // Delete this and all future activities from the same schedule
+      const { data: futureActs } = await supabase.from('activities')
+        .select('id')
+        .eq('recurring_schedule_id', activity.recurring_schedule_id)
+        .gte('start_time', activity.start_time)
+        .in('status', ['awaiting_acceptance', 'scheduled'])
+
+      if (futureActs) {
+        const ids = futureActs.map((a: any) => a.id)
+        await supabase.from('activity_status_history').delete().in('activity_id', ids)
+        await supabase.from('activities').delete().in('id', ids)
+      }
+    } else {
+      await supabase.from('activity_status_history').delete().eq('activity_id', id)
+      await supabase.from('activities').delete().eq('id', id)
+    }
+    setShowDeleteModal(false)
     router.push('/client/calendar')
   }
 
@@ -232,6 +256,36 @@ export default function ClientActivityPage() {
           )}
         </div>
       </div>
+
+      {/* Recurring delete modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Delete Recurring Activity</h2>
+              <p className="text-sm text-gray-500 mb-5">
+                This activity is part of a recurring schedule. What would you like to delete?
+              </p>
+              <div className="space-y-2">
+                <button onClick={() => doDelete('single')} disabled={deleting}
+                  className="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                  <p className="font-semibold text-sm text-gray-900">This activity only</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Delete only this single occurrence</p>
+                </button>
+                <button onClick={() => doDelete('future')} disabled={deleting}
+                  className="w-full text-left p-3 rounded-xl border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50">
+                  <p className="font-semibold text-sm text-red-700">This and all future activities</p>
+                  <p className="text-xs text-red-500 mt-0.5">Delete this and all upcoming activities in this schedule</p>
+                </button>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <button onClick={() => setShowDeleteModal(false)}
+                className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit form */}
       {editing && (

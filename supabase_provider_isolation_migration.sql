@@ -38,3 +38,26 @@ alter table clients add column if not exists provider_id uuid references provide
 -- Backfill clients:
 -- UPDATE clients SET provider_id = (SELECT id FROM providers LIMIT 1)
 -- WHERE provider_id IS NULL;
+
+-- 6. Junction table for clients belonging to multiple providers
+create table if not exists provider_clients (
+  id uuid primary key default uuid_generate_v4(),
+  provider_id uuid references providers(id) on delete cascade,
+  client_id uuid references clients(id) on delete cascade,
+  active boolean default true,
+  created_at timestamptz default now(),
+  unique(provider_id, client_id)
+);
+
+alter table provider_clients enable row level security;
+create policy "Authenticated users can do everything" on provider_clients
+  for all using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
+
+create index if not exists idx_provider_clients_provider on provider_clients(provider_id);
+create index if not exists idx_provider_clients_client on provider_clients(client_id);
+
+-- Backfill existing clients into junction:
+-- INSERT INTO provider_clients (provider_id, client_id)
+-- SELECT provider_id, id FROM clients WHERE provider_id IS NOT NULL
+-- ON CONFLICT DO NOTHING;

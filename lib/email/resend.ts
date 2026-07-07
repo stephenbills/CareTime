@@ -9,10 +9,12 @@ export async function sendEmail({
   to,
   subject,
   html,
+  attachments,
 }: {
   to: string | string[]
   subject: string
   html: string
+  attachments?: { name: string; content: string }[] // base64 encoded content
 }) {
   const apiKey = process.env.BREVO_API_KEY
 
@@ -23,11 +25,18 @@ export async function sendEmail({
 
   const recipients = Array.isArray(to) ? to : [to]
 
-  const body = {
+  const body: any = {
     sender: { name: FROM_NAME, email: FROM_EMAIL },
     to: recipients.map(email => ({ email })),
     subject,
     htmlContent: html,
+  }
+
+  if (attachments && attachments.length > 0) {
+    body.attachment = attachments.map(a => ({
+      name: a.name,
+      content: a.content,
+    }))
   }
 
   try {

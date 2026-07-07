@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireProvider } from '@/lib/api/auth'
 import { sendEmail } from '@/lib/email/resend'
+import { generateInvoicePdf } from '@/lib/invoice/pdf'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'
 
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     // Get provider rates
     const { data: provider } = await admin.from('providers')
-      .select('id, name, client_charge_pct, worker_pay_pct')
+      .select('id, name, client_charge_pct, worker_pay_pct, address_line1, suburb, state, postcode, abn')
       .eq('id', caller.providerId).single()
 
     if (!provider) return NextResponse.json({ error: 'Provider not found' }, { status: 404 })
@@ -164,8 +165,33 @@ export async function POST(req: NextRequest) {
 
       invoiceIds.push(invoice.id)
 
-      // Email invoice to client
+      // Email invoice to client with PDF attachment
       if (client?.email) {
+        // Generate PDF
+        let pdfBase64 = ''
+        try {
+          const pdfBytes = await generateInvoicePdf({
+            invoiceNumber,
+            providerName: provider.name,
+            providerAddress: [provider.address_line1, provider.suburb, provider.state, provider.postcode].filter(Boolean).join(', ') || undefined,
+            providerAbn: provider.abn || undefined,
+            clientName: client.name,
+            periodStart,
+            periodEnd,
+            lineItems,
+            totalHours: Math.round(totalHours * 100) / 100,
+            totalAmount: Math.round(totalAmount * 100) / 100,
+            totalWorkerCost: Math.round(totalWorkerCost * 100) / 100,
+            sentDate: new Date().toISOString(),
+          })
+          // Convert Uint8Array to base64
+          const binaryStr = Array.from(pdfBytes).map(b => String.fromCharCode(b)).join('')
+          pdfBase64 = btoa(binaryStr)
+          console.log(`[/api/invoices] PDF generated: ${pdfBytes.length} bytes`)
+        } catch (pdfErr: any) {
+          console.error('[/api/invoices] PDF generation failed:', pdfErr.message)
+        }
+
         const html = buildInvoiceEmail({
           clientName: client.name,
           providerName: provider.name,
@@ -182,6 +208,10 @@ export async function POST(req: NextRequest) {
             to: client.email,
             subject: `Invoice ${invoiceNumber} from ${provider.name}`,
             html,
+            attachments: pdfBase64 ? [{
+              name: `${invoiceNumber}.pdf`,
+              content: pdfBase64,
+            }] : undefined,
           })
           console.log('[/api/invoices] Invoice emailed to', client.email)
         } catch (emailErr: any) {
