@@ -107,6 +107,11 @@ export default function WeekView({
       const end = new Date(act.end_time)
       const label = getLabel(act)
 
+      // Skip activities with invalid dates
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) continue
+      // Skip if dates are unreasonably far apart (> 48 hours — likely bad data)
+      if (Math.abs(end.getTime() - start.getTime()) > 48 * 60 * 60 * 1000) continue
+
       for (let di = 0; di < 7; di++) {
         const day = weekDays[di]
         const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0)

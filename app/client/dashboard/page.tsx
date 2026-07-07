@@ -5,6 +5,7 @@ import { Clock, CheckCircle, ChevronRight, Calendar } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_COLORS: Record<string, string> = {
+  awaiting_acceptance: 'bg-yellow-100 text-yellow-800',
   scheduled: 'bg-blue-100 text-blue-800',
   in_progress: 'bg-purple-100 text-purple-800',
   awaiting_client_approval: 'bg-orange-100 text-orange-800',
@@ -15,6 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  awaiting_acceptance: 'Awaiting Acceptance',
   scheduled: 'Scheduled',
   in_progress: 'In Progress',
   awaiting_client_approval: 'Needs Your Approval',
@@ -66,11 +68,11 @@ export default function ClientDashboard() {
           .order('actual_end_time', { ascending: true }),
         supabase.from('activities').select('*')
           .eq('client_id', clientData.id)
-          .in('status', ['scheduled', 'in_progress'])
+          .in('status', ['awaiting_acceptance', 'scheduled', 'in_progress'])
           .gte('start_time', now.toISOString())
           .lte('start_time', futureEnd)
           .order('start_time')
-          .limit(5),
+          .limit(10),
         supabase.from('carers').select('id, name'),
       ])
 

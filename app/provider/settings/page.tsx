@@ -1,11 +1,12 @@
 'use client'
 import Link from 'next/link'
-import { ChevronRight, Building2, ClipboardList, DollarSign, CalendarDays, Users } from 'lucide-react'
+import { ChevronRight, Building2, ClipboardList, DollarSign, CalendarDays, Users, GitBranch } from 'lucide-react'
 
 const SETTINGS_LINKS = [
   { href: '/provider/settings/details', icon: Building2, label: 'Provider Details', desc: 'Organisation info, admin fees, and bank details' },
   { href: '/provider/settings/ndis', icon: ClipboardList, label: 'NDIS Line Items', desc: 'Select line items from the master catalogue' },
   { href: '/provider/settings/rates', icon: DollarSign, label: 'Billing Rates', desc: 'Set client charge and worker pay percentages of NDIS rates' },
+  { href: '/provider/settings/status', icon: GitBranch, label: 'Activity Statuses', desc: 'View and customise the activity workflow' },
   { href: '/provider/settings/holidays', icon: CalendarDays, label: 'Public Holidays', desc: 'Define public holidays for billing calculations' },
   { href: '/provider/settings/users', icon: Users, label: 'User Management', desc: 'Manage staff who can access this Provider account' },
 ]

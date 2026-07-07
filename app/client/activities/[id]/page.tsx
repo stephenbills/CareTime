@@ -193,8 +193,7 @@ export default function ClientActivityPage() {
   }
 
   const canEdit = activity && !['paid', 'in_progress'].includes(activity.status)
-  const canDelete = activity && ['awaiting_acceptance', 'scheduled'].includes(activity.status) &&
-    new Date(activity.start_time) > new Date()
+  const canDelete = activity && ['awaiting_acceptance', 'scheduled', 'rejected', 'cancelled'].includes(activity.status)
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
