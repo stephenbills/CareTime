@@ -32,6 +32,9 @@ export default function LoginPage() {
   // Multi-role state
   const [roles, setRoles] = useState<UserRole[]>([])
   const [showRolePicker, setShowRolePicker] = useState(false)
+  // Multi-provider worker state
+  const [workerProviders, setWorkerProviders] = useState<any[]>([])
+  const [showProviderPicker, setShowProviderPicker] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -53,7 +56,7 @@ export default function LoginPage() {
     }
 
     if (userRoles.length === 1) {
-      router.push(ROLE_ROUTES[userRoles[0]!])
+      await navigateToRole(userRoles[0]!, data.user.id)
     } else {
       setRoles(userRoles)
       setShowRolePicker(true)
@@ -61,8 +64,41 @@ export default function LoginPage() {
     }
   }
 
+  async function navigateToRole(role: UserRole, userId?: string) {
+    if (role === 'worker') {
+      // Check if worker belongs to multiple providers
+      const uid = userId || (await supabase.auth.getUser()).data.user?.id
+      if (!uid) { router.push(ROLE_ROUTES[role!]); return }
+
+      const { data: carer } = await supabase.from('carers').select('id').eq('user_id', uid).maybeSingle()
+      if (carer) {
+        const { data: links } = await supabase
+          .from('provider_carers')
+          .select('provider_id, providers(id, name)')
+          .eq('carer_id', carer.id)
+          .eq('active', true)
+
+        const provs = (links || []).map((l: any) => l.providers).filter(Boolean)
+        if (provs.length > 1) {
+          setWorkerProviders(provs)
+          setShowProviderPicker(true)
+          setShowRolePicker(false)
+          return
+        } else if (provs.length === 1) {
+          localStorage.setItem('caretime_worker_provider', provs[0].id)
+        }
+      }
+    }
+    router.push(ROLE_ROUTES[role!])
+  }
+
   function selectRole(role: UserRole) {
-    if (role) router.push(ROLE_ROUTES[role])
+    if (role) navigateToRole(role)
+  }
+
+  function selectWorkerProvider(providerId: string) {
+    localStorage.setItem('caretime_worker_provider', providerId)
+    router.push(ROLE_ROUTES.worker)
   }
 
   async function handleResetPassword(e: React.FormEvent) {
@@ -79,6 +115,36 @@ export default function LoginPage() {
     if (!res.ok) { setError(result.error || 'Failed to send reset email. Please try again.') }
     else { setResetSent(true) }
     setResetLoading(false)
+  }
+
+  // Provider picker for multi-provider workers
+  if (showProviderPicker) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 bg-green-600 rounded-full flex items-center justify-center">
+              <UserCheck size={24} className="text-white" />
+            </div>
+          </div>
+          <h1 className="text-xl font-bold text-center text-gray-900 mb-1">Select Provider</h1>
+          <p className="text-center text-gray-500 text-sm mb-6">
+            You work for multiple providers. Which one do you want to connect to?
+          </p>
+          <div className="space-y-3">
+            {workerProviders.map((prov: any) => (
+              <button key={prov.id} onClick={() => selectWorkerProvider(prov.id)}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-all">
+                <Briefcase size={22} />
+                <div className="text-left">
+                  <p className="font-semibold text-sm">{prov.name}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Role picker screen

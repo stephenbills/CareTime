@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Users, UserCheck, Activity, Clock, UserX, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const STATUS_COLORS: Record<string, string> = {
   awaiting_acceptance: 'bg-yellow-100 text-yellow-800',
@@ -29,29 +30,34 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [assigningId, setAssigningId] = useState<string | null>(null)
+  const { providerId } = useProviderId()
   const supabase = createClient()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (providerId) load() }, [providerId])
 
   async function load() {
+    if (!providerId) return
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
     const [clientsRes, workersRes, activitiesRes, pendingRes, unassignedRes, paymentRes, clientsData, workersData] =
       await Promise.all([
-        supabase.from('clients').select('id', { count: 'exact' }).eq('active', true),
-        supabase.from('carers').select('id', { count: 'exact' }).eq('active', true),
-        supabase.from('activities').select('id', { count: 'exact' }).gte('created_at', monthStart),
-        supabase.from('activities').select('id', { count: 'exact' }).eq('status', 'awaiting_client_approval'),
+        supabase.from('clients').select('id', { count: 'exact' }).eq('active', true).eq('provider_id', providerId),
+        supabase.from('provider_carers').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('active', true),
+        supabase.from('activities').select('id', { count: 'exact' }).eq('provider_id', providerId).gte('created_at', monthStart),
+        supabase.from('activities').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('status', 'awaiting_client_approval'),
         supabase.from('activities').select('id, title, start_time, client_id')
+          .eq('provider_id', providerId)
           .is('carer_id', null)
           .not('status', 'in', '("cancelled","rejected","paid")')
           .order('start_time'),
         supabase.from('activities').select('id, title, start_time, actual_end_time, client_id, carer_id')
+          .eq('provider_id', providerId)
           .eq('status', 'awaiting_payment_approval')
           .order('actual_end_time'),
-        supabase.from('clients').select('id, name'),
-        supabase.from('carers').select('id, name').eq('active', true).order('name'),
+        supabase.from('clients').select('id, name').eq('provider_id', providerId),
+        supabase.from('provider_carers').select('carer_id, carers(id, name)')
+          .eq('provider_id', providerId).eq('active', true),
       ])
 
     setStats({
@@ -63,8 +69,9 @@ export default function DashboardPage() {
     setUnassigned(unassignedRes.data || [])
     setAwaitingPayment(paymentRes.data || [])
     setClientMap(Object.fromEntries((clientsData.data || []).map((c: any) => [c.id, c.name])))
-    setWorkerMap(Object.fromEntries((workersData.data || []).map((w: any) => [w.id, w.name])))
-    setWorkerList(workersData.data || [])
+    const wks = (workersData.data || []).map((pc: any) => pc.carers).filter(Boolean)
+    setWorkerMap(Object.fromEntries(wks.map((w: any) => [w.id, w.name])))
+    setWorkerList(wks)
     setLoading(false)
   }
 

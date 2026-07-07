@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, FileText, Check, Eye } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const STATUS_STYLE: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -21,14 +22,16 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [marking, setMarking] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const { providerId } = useProviderId()
   const supabase = createClient()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (providerId) load() }, [providerId])
 
   async function load() {
+    if (!providerId) return
     const [{ data: invs }, { data: cls }] = await Promise.all([
-      supabase.from('invoices').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, name'),
+      supabase.from('invoices').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }),
+      supabase.from('clients').select('id, name').eq('provider_id', providerId),
     ])
     setInvoices(invs || [])
     setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))

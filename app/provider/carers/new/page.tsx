@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Field, TextArea, Section, SaveBar } from '@/components/FormFields'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const EMPTY = {
   name: '', email: '', mobile: '', home_phone: '', work_phone: '',
@@ -16,6 +17,7 @@ export default function NewCarerPage() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const { providerId } = useProviderId()
   const router = useRouter()
   const supabase = createClient()
 
@@ -39,13 +41,23 @@ export default function NewCarerPage() {
       car_registration: data.car_registration || null, abn: data.abn || null,
       bank_bsb: data.bank_bsb || null, bank_account_number: data.bank_account_number || null,
       comments: data.comments || null, active: true,
+      provider_id: providerId,
     }
 
     const { data: created, error: err } = await supabase
       .from('carers').insert(payload).select().single()
     if (err) { setError(err.message); setSaving(false); return }
 
-    // Send Supabase invite email
+    // Create junction table entry linking worker to this provider
+    if (providerId) {
+      await supabase.from('provider_carers').insert({
+        provider_id: providerId,
+        carer_id: created.id,
+        active: true,
+      })
+    }
+
+    // Send invite email
     const inviteRes = await fetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -53,7 +65,6 @@ export default function NewCarerPage() {
     })
     const inviteData = await inviteRes.json()
     if (!inviteRes.ok) {
-      // Don't block — worker is saved, just warn about invite
       console.warn('Invite failed:', inviteData.error)
     }
 

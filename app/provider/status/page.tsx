@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Search, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const STATUSES = [
   { value: 'awaiting_acceptance', label: 'Awaiting Acceptance', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
@@ -31,19 +32,22 @@ export default function StatusPage() {
   const [search, setSearch] = useState('')
   const [changingId, setChangingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const { providerId } = useProviderId()
   const supabase = createClient()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (providerId) load() }, [providerId])
 
   async function load() {
+    if (!providerId) return
     const [{ data: acts }, { data: cls }, { data: wks }] = await Promise.all([
-      supabase.from('activities').select('*').order('start_time', { ascending: false }).limit(200),
-      supabase.from('clients').select('id, name'),
-      supabase.from('carers').select('id, name'),
+      supabase.from('activities').select('*').eq('provider_id', providerId).order('start_time', { ascending: false }).limit(200),
+      supabase.from('clients').select('id, name').eq('provider_id', providerId),
+      supabase.from('provider_carers').select('carer_id, carers(id, name)').eq('provider_id', providerId),
     ])
     setActivities(acts || [])
     setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
-    setWorkers(Object.fromEntries((wks || []).map((w: any) => [w.id, w.name])))
+    const workers = (wks || []).map((pc: any) => pc.carers).filter(Boolean)
+    setWorkers(Object.fromEntries(workers.map((w: any) => [w.id, w.name])))
     setLoading(false)
   }
 

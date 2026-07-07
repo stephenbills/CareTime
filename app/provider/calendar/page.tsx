@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import WeekView from '@/components/WeekView'
 import { Suspense } from 'react'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -60,22 +61,26 @@ function CalendarInner() {
   const [filterClient, setFilterClient] = useState('')
   const [filterCarer, setFilterCarer] = useState('')
   const supabase = createClient()
+  const { providerId } = useProviderId()
 
   useEffect(() => {
-    async function load() {
-      const from = new Date(year, month - 1, 1).toISOString()
-      const to = new Date(year, month + 2, 0, 23, 59, 59).toISOString()
-      const [{ data: acts }, { data: cls }, { data: crs }] = await Promise.all([
-        supabase.from('activities').select('*').gte('start_time', from).lte('start_time', to).order('start_time'),
-        supabase.from('clients').select('id, name').eq('active', true),
-        supabase.from('carers').select('id, name').eq('active', true),
-      ])
-      setActivities(acts || [])
-      setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
-      setCarers(Object.fromEntries((crs || []).map((c: any) => [c.id, c.name])))
-    }
-    load()
-  }, [year, month])
+    if (providerId) load()
+  }, [year, month, providerId])
+
+  async function load() {
+    if (!providerId) return
+    const from = new Date(year, month - 1, 1).toISOString()
+    const to = new Date(year, month + 2, 0, 23, 59, 59).toISOString()
+    const [{ data: acts }, { data: cls }, { data: crs }] = await Promise.all([
+      supabase.from('activities').select('*').eq('provider_id', providerId).gte('start_time', from).lte('start_time', to).order('start_time'),
+      supabase.from('clients').select('id, name').eq('active', true).eq('provider_id', providerId),
+      supabase.from('provider_carers').select('carer_id, carers(id, name)').eq('provider_id', providerId).eq('active', true),
+    ])
+    setActivities(acts || [])
+    setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
+    const wks = (crs || []).map((pc: any) => pc.carers).filter(Boolean)
+    setCarers(Object.fromEntries(wks.map((w: any) => [w.id, w.name])))
+  }
 
   function prevMonth() {
     if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1)

@@ -3,17 +3,20 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, ChevronRight, Mail, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [inviting, setInviting] = useState<string | null>(null)
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
+  const { providerId } = useProviderId()
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.from('clients').select('*').order('name').then(({ data }) => setClients(data || []))
-  }, [])
+    if (providerId) supabase.from('clients').select('*').eq('provider_id', providerId).order('name')
+      .then(({ data }) => setClients(data || []))
+  }, [providerId])
 
   async function sendInvite(client: any) {
     if (!client.email) return
@@ -25,7 +28,7 @@ export default function ClientsPage() {
     })
     if (res.ok) {
       setInvitedIds(prev => new Set([...prev, client.id]))
-      const { data } = await supabase.from('clients').select('*').order('name')
+      const { data } = await supabase.from('clients').select('*').eq('provider_id', providerId!).order('name')
       setClients(data || [])
     }
     setInviting(null)

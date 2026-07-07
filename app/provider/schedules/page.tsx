@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Plus, ChevronRight, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react'
 import Link from 'next/link'
 import { RRule } from 'rrule'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -30,19 +31,22 @@ export default function SchedulesPage() {
   const [workers, setWorkers] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
+  const { providerId } = useProviderId()
   const supabase = createClient()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (providerId) load() }, [providerId])
 
   async function load() {
+    if (!providerId) return
     const [{ data: scheds }, { data: cls }, { data: wks }] = await Promise.all([
-      supabase.from('recurring_schedules').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, name'),
-      supabase.from('carers').select('id, name'),
+      supabase.from('recurring_schedules').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }),
+      supabase.from('clients').select('id, name').eq('provider_id', providerId),
+      supabase.from('provider_carers').select('carer_id, carers(id, name)').eq('provider_id', providerId),
     ])
     setSchedules(scheds || [])
     setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
-    setWorkers(Object.fromEntries((wks || []).map((w: any) => [w.id, w.name])))
+    const workerList = (wks || []).map((pc: any) => pc.carers).filter(Boolean)
+    setWorkers(Object.fromEntries(workerList.map((w: any) => [w.id, w.name])))
     setLoading(false)
   }
 

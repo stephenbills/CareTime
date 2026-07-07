@@ -3,17 +3,28 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, ChevronRight, Mail, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 export default function CarersPage() {
   const [workers, setWorkers] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [inviting, setInviting] = useState<string | null>(null)
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set())
+  const { providerId } = useProviderId()
   const supabase = createClient()
 
-  useEffect(() => {
-    supabase.from('carers').select('*').order('name').then(({ data }) => setWorkers(data || []))
-  }, [])
+  useEffect(() => { if (providerId) loadWorkers() }, [providerId])
+
+  async function loadWorkers() {
+    if (!providerId) return
+    // Get workers linked to this provider via junction table
+    const { data: links } = await supabase
+      .from('provider_carers')
+      .select('carer_id, carers(*)')
+      .eq('provider_id', providerId)
+    const wks = (links || []).map((l: any) => l.carers).filter(Boolean)
+    setWorkers(wks)
+  }
 
   async function sendInvite(worker: any) {
     if (!worker.email) return
@@ -25,9 +36,7 @@ export default function CarersPage() {
     })
     if (res.ok) {
       setInvitedIds(prev => new Set([...prev, worker.id]))
-      // Refresh to pick up user_id if just linked
-      const { data } = await supabase.from('carers').select('*').order('name')
-      setWorkers(data || [])
+      await loadWorkers()
     }
     setInviting(null)
   }
