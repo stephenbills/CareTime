@@ -18,10 +18,11 @@ export default function CarersPage() {
   async function loadWorkers() {
     if (!providerId) return
     // Get workers linked to this provider via junction table
-    const { data: links } = await supabase
+    const { data: links, error: err } = await supabase
       .from('provider_carers')
       .select('carer_id, active, carers(*)')
       .eq('provider_id', providerId)
+    if (err) console.error('loadWorkers failed:', err)
     const wks = (links || [])
       .map((l: any) => l.carers ? { ...l.carers, active: l.active } : null)
       .filter(Boolean)

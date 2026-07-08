@@ -23,7 +23,7 @@ function StarRating({ value }: { value: number | null }) {
 
 export default function CarerDetailPage() {
   const [worker, setWorker] = useState<any>(null)
-  const [linkId, setLinkId] = useState<string | null>(null)
+  const [linked, setLinked] = useState(false)
   const [link, setLink] = useState<Record<string, string>>(EMPTY_LINK)
   const [active, setActive] = useState(true)
   const [ratings, setRatings] = useState({ client: null as number | null, provider: null as number | null })
@@ -51,7 +51,7 @@ export default function CarerDetailPage() {
         .from('provider_carers').select('*')
         .eq('provider_id', providerId).eq('carer_id', id).maybeSingle()
       if (pc) {
-        setLinkId(pc.id)
+        setLinked(true)
         setActive(pc.active ?? true)
         setLink({
           notes: pc.notes || '',
@@ -76,7 +76,7 @@ export default function CarerDetailPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!linkId) { setError('This worker is not linked to your organisation'); return }
+    if (!linked) { setError('This worker is not linked to your organisation'); return }
     setSaving(true)
 
     const payload = {
@@ -86,7 +86,9 @@ export default function CarerDetailPage() {
       end_date: link.end_date || null,
     }
 
-    const { error: err } = await supabase.from('provider_carers').update(payload).eq('id', linkId)
+    const { error: err } = await supabase.from('provider_carers')
+      .update(payload)
+      .eq('provider_id', providerId).eq('carer_id', id)
     if (err) { setError(err.message); setSaving(false); return }
 
     setSaving(false)

@@ -43,7 +43,7 @@ export default function DashboardPage() {
     const [clientsRes, workersRes, activitiesRes, pendingRes, unassignedRes, paymentRes, clientsData, workersData] =
       await Promise.all([
         supabase.from('provider_clients').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('active', true),
-        supabase.from('provider_carers').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('active', true),
+        supabase.from('provider_carers').select('carer_id', { count: 'exact' }).eq('provider_id', providerId).eq('active', true),
         supabase.from('activities').select('id', { count: 'exact' }).eq('provider_id', providerId).gte('created_at', monthStart),
         supabase.from('activities').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('status', 'awaiting_client_approval'),
         supabase.from('activities').select('id, title, start_time, client_id')

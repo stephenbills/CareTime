@@ -45,7 +45,7 @@ export default function NewCarerPage() {
 
       const { data: link } = await supabase
         .from('provider_carers')
-        .select('id')
+        .select('carer_id')
         .eq('provider_id', providerId!)
         .eq('carer_id', workerId)
         .maybeSingle()

@@ -17,7 +17,12 @@ alter table provider_clients add column if not exists notes text;
 alter table provider_clients add column if not exists start_date date;
 alter table provider_clients add column if not exists end_date date;
 
--- 2. Provider-specific columns for the worker relationship (active already exists)
+-- 2. Provider-specific columns for the worker relationship.
+-- NOTE: unlike provider_clients, the live provider_carers table has no `active`
+-- column at all (it uses a composite primary key of provider_id + carer_id,
+-- not a synthetic id) — it was never added despite the original isolation
+-- migration assuming it existed. Add it here for real.
+alter table provider_carers add column if not exists active boolean default true;
 alter table provider_carers add column if not exists notes text;
 alter table provider_carers add column if not exists start_date date;
 alter table provider_carers add column if not exists end_date date;
