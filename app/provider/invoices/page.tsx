@@ -31,10 +31,11 @@ export default function InvoicesPage() {
     if (!providerId) return
     const [{ data: invs }, { data: cls }] = await Promise.all([
       supabase.from('invoices').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, name').eq('provider_id', providerId),
+      supabase.from('provider_clients').select('client_id, clients(id, name)').eq('provider_id', providerId).eq('active', true),
     ])
     setInvoices(invs || [])
-    setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
+    const clientList = (cls || []).map((pc: any) => pc.clients).filter(Boolean)
+    setClients(Object.fromEntries(clientList.map((c: any) => [c.id, c.name])))
     setLoading(false)
   }
 

@@ -40,11 +40,12 @@ export default function SchedulesPage() {
     if (!providerId) return
     const [{ data: scheds }, { data: cls }, { data: wks }] = await Promise.all([
       supabase.from('recurring_schedules').select('*').eq('provider_id', providerId).order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, name').eq('provider_id', providerId),
+      supabase.from('provider_clients').select('client_id, clients(id, name)').eq('provider_id', providerId).eq('active', true),
       supabase.from('provider_carers').select('carer_id, carers(id, name)').eq('provider_id', providerId),
     ])
     setSchedules(scheds || [])
-    setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
+    const clientList = (cls || []).map((pc: any) => pc.clients).filter(Boolean)
+    setClients(Object.fromEntries(clientList.map((c: any) => [c.id, c.name])))
     const workerList = (wks || []).map((pc: any) => pc.carers).filter(Boolean)
     setWorkers(Object.fromEntries(workerList.map((w: any) => [w.id, w.name])))
     setLoading(false)

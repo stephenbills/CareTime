@@ -21,6 +21,7 @@ export default function ClientsPage() {
       .from('provider_clients')
       .select('client_id, clients(*)')
       .eq('provider_id', providerId)
+      .eq('active', true)
     const cls = (links || []).map((l: any) => l.clients).filter(Boolean)
     setClients(cls)
   }
