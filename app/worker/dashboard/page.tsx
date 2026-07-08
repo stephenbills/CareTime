@@ -38,7 +38,7 @@ function formatDate(iso: string) {
 export default function CarerDashboard() {
   const [worker, setCarer] = useState<any>(null)
   const [todayActs, setTodayActs] = useState<any[]>([])
-  const [awaitingCount, setAwaitingCount] = useState(0)
+  const [awaitingList, setAwaitingList] = useState<any[]>([])
   const [upcoming, setUpcoming] = useState<any[]>([])
   const [clients, setClients] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -61,7 +61,7 @@ export default function CarerDashboard() {
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
       const futureEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
 
-      const [{ data: today }, { data: future }, { data: cls }] = await Promise.all([
+      const [{ data: today }, { data: upcomingScheduled }, { data: awaiting }, { data: cls }] = await Promise.all([
         supabase.from('activities').select('*')
           .eq('carer_id', carerData.id)
           .gte('start_time', todayStart)
@@ -71,15 +71,20 @@ export default function CarerDashboard() {
           .eq('carer_id', carerData.id)
           .gt('start_time', todayEnd)
           .lte('start_time', futureEnd)
-          .in('status', ['scheduled', 'awaiting_acceptance'])
+          .eq('status', 'scheduled')
           .order('start_time')
           .limit(5),
+        supabase.from('activities').select('*')
+          .eq('carer_id', carerData.id)
+          .eq('status', 'awaiting_acceptance')
+          .gte('start_time', todayStart)
+          .order('start_time'),
         supabase.from('clients').select('id, name'),
       ])
 
       setTodayActs(today || [])
-      setUpcoming(future || [])
-      setAwaitingCount([...(today || []), ...(future || [])].filter((a: any) => a.status === 'awaiting_acceptance').length)
+      setUpcoming(upcomingScheduled || [])
+      setAwaitingList(awaiting || [])
       setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
       setLoading(false)
     }
@@ -115,12 +120,34 @@ export default function CarerDashboard() {
           <p className="text-3xl font-bold text-gray-900">{todayActs.length}</p>
           <p className="text-xs text-gray-500 mt-0.5">activit{todayActs.length !== 1 ? 'ies' : 'y'}</p>
         </div>
-        <div className={`rounded-2xl border p-4 shadow-sm ${awaitingCount > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-100'}`}>
-          <p className={`text-xs mb-1 ${awaitingCount > 0 ? 'text-yellow-600' : 'text-gray-400'}`}>Awaiting</p>
-          <p className={`text-3xl font-bold ${awaitingCount > 0 ? 'text-yellow-700' : 'text-gray-900'}`}>{awaitingCount}</p>
-          <p className={`text-xs mt-0.5 ${awaitingCount > 0 ? 'text-yellow-600' : 'text-gray-500'}`}>acceptance</p>
+        <div className={`rounded-2xl border p-4 shadow-sm ${awaitingList.length > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-100'}`}>
+          <p className={`text-xs mb-1 ${awaitingList.length > 0 ? 'text-yellow-600' : 'text-gray-400'}`}>Awaiting</p>
+          <p className={`text-3xl font-bold ${awaitingList.length > 0 ? 'text-yellow-700' : 'text-gray-900'}`}>{awaitingList.length}</p>
+          <p className={`text-xs mt-0.5 ${awaitingList.length > 0 ? 'text-yellow-600' : 'text-gray-500'}`}>acceptance</p>
         </div>
       </div>
+
+      {/* Awaiting Acceptance */}
+      {awaitingList.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Awaiting Acceptance</h2>
+          <div className="bg-white rounded-2xl border border-yellow-200 shadow-sm divide-y divide-gray-50">
+            {awaitingList.map(act => (
+              <Link key={act.id} href={`/worker/activities/${act.id}`}
+                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{act.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {formatDate(act.start_time)} · {formatTime(act.start_time)}
+                    {act.client_id && ` · ${clients[act.client_id] || '—'}`}
+                  </p>
+                </div>
+                <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Today's activities */}
       {todayActs.length > 0 && (
@@ -185,7 +212,7 @@ export default function CarerDashboard() {
         </div>
       )}
 
-      {todayActs.length === 0 && upcoming.length === 0 && (
+      {todayActs.length === 0 && upcoming.length === 0 && awaitingList.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
           <Calendar size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">No activities scheduled.</p>

@@ -119,7 +119,42 @@ export default function CarerActivityPage() {
   }
 
   async function handleAccept() {
-    await updateStatus('scheduled')
+    setActing(true)
+    setError('')
+
+    if (activity.recurring_schedule_id) {
+      // Accept every other occurrence in this recurring schedule that's still awaiting acceptance too
+      const { data: siblings, error: fetchErr } = await supabase
+        .from('activities')
+        .select('id')
+        .eq('recurring_schedule_id', activity.recurring_schedule_id)
+        .eq('status', 'awaiting_acceptance')
+      if (fetchErr) { setError(fetchErr.message); setActing(false); return }
+
+      const ids = (siblings || []).map((a: any) => a.id)
+      if (ids.length > 0) {
+        const { error: updErr } = await supabase.from('activities')
+          .update({ status: 'scheduled' })
+          .in('id', ids)
+        if (updErr) { setError(updErr.message); setActing(false); return }
+
+        const { data: { user } } = await supabase.auth.getUser()
+        await supabase.from('activity_status_history').insert(
+          ids.map((activityId: string) => ({
+            activity_id: activityId,
+            from_status: 'awaiting_acceptance',
+            to_status: 'scheduled',
+            changed_by: user!.id,
+          }))
+        )
+      }
+
+      await load()
+      setActing(false)
+    } else {
+      await updateStatus('scheduled')
+    }
+
     if (client?.email) {
       notify('activity_accepted', client.email, {
         recipientName: client.name,
