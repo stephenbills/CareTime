@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, FileText, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -52,18 +53,26 @@ export default function GenerateInvoicesPage() {
   const [error, setError] = useState('')
   const router = useRouter()
   const supabase = createClient()
+  const { providerId } = useProviderId()
 
   useEffect(() => {
+    if (!providerId) return
     async function load() {
-      const [{ data: cls }, { data: wks }] = await Promise.all([
-        supabase.from('clients').select('id, name').eq('active', true).order('name'),
-        supabase.from('carers').select('id, name'),
+      const [{ data: clientLinks }, { data: workerLinks }] = await Promise.all([
+        supabase.from('provider_clients')
+          .select('client_id, clients(id, name)')
+          .eq('provider_id', providerId).eq('active', true),
+        supabase.from('provider_carers')
+          .select('carer_id, carers(id, name)')
+          .eq('provider_id', providerId),
       ])
-      setClients(cls || [])
-      setWorkers(Object.fromEntries((wks || []).map((w: any) => [w.id, w.name])))
+      const cls = (clientLinks || []).map((l: any) => l.clients).filter(Boolean)
+      const wks = (workerLinks || []).map((l: any) => l.carers).filter(Boolean)
+      setClients(cls)
+      setWorkers(Object.fromEntries(wks.map((w: any) => [w.id, w.name])))
     }
     load()
-  }, [])
+  }, [providerId])
 
   async function handlePreview() {
     setLoading(true)

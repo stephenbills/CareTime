@@ -19,10 +19,11 @@ export default function ClientsPage() {
     if (!providerId) return
     const { data: links } = await supabase
       .from('provider_clients')
-      .select('client_id, clients(*)')
+      .select('client_id, active, clients(*)')
       .eq('provider_id', providerId)
-      .eq('active', true)
-    const cls = (links || []).map((l: any) => l.clients).filter(Boolean)
+    const cls = (links || [])
+      .map((l: any) => l.clients ? { ...l.clients, active: l.active } : null)
+      .filter(Boolean)
     setClients(cls)
   }
 

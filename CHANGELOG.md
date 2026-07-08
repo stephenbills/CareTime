@@ -4,6 +4,24 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 32 — 8 July 2026
+
+### Split Shared vs Provider-Specific Data for Clients and Workers
+
+- `provider_clients` gains `notes`, `start_date`, `end_date` (in addition to existing `active`); `provider_carers` gains the same three (its `active` column already existed)
+- New migration: `supabase_split_provider_data_migration.sql` — adds the columns only, does not drop anything from `clients`/`carers`
+- Provider clients list and workers list now read `active` from the junction row (`provider_clients`/`provider_carers`), not from `clients.active`/`carers.active` — lists show every linked record with an Inactive badge rather than filtering it out, so a provider can still see and reactivate someone they've deactivated
+- Provider client/worker edit pages split into a read-only "Personal Details" section (sourced from `clients`/`carers` — name, contact, address, payment info) and an editable "Your Notes" section (sourced from the junction row — Active toggle, Notes, Start Date, End Date). Providers can no longer edit a client's or worker's personal details; that now belongs to the person themselves
+- "Add Client"/"Add Worker" forms write the initial comments into `provider_clients.notes`/`provider_carers.notes` instead of `clients.comments`/`carers.comments`
+- Activity, schedule, and invoice-generation forms' client/worker pickers now query through `provider_clients`/`provider_carers` (scoped to the current provider, filtered to active links) instead of querying `clients`/`carers` directly — this also fixes a data-isolation gap where those pickers previously showed every client/worker across all providers, not just the current provider's
+- New `/client/details` "My Details" page — lets a client edit their own name, email, phone, address, and NDIS number directly on the `clients` table
+- Verified `/worker/details` already writes directly to the `carers` table — no change needed
+
+### Known follow-ups (not in this session)
+- `app/app/*` is a stale, unreferenced duplicate of the entire route tree (last touched Session pre-29, before junction tables existed) with no `provider_id` scoping at all. No links point to it, so it's dead code, but it should eventually be deleted.
+- `app/provider/carers/[id]/page.tsx` and the worker's own `/worker/details` page don't cover the same field set — `work_phone`, `car_registration`, and `abn` are no longer editable by the provider but aren't yet editable on `/worker/details` either.
+- `app/api/invoices/route.ts`'s activity query has no `provider_id` scoping — a separate pre-existing data-isolation gap on the `activities` table, outside the scope of this client/worker split.
+
 ## Session 31 — 8 July 2026
 
 ### Junction Table Consistency

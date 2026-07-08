@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import RecurrencePicker from '@/components/RecurrencePicker'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const DURATIONS = [
   { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
@@ -67,6 +68,7 @@ export default function ScheduleFormPage() {
   const isNew = !id || id === 'new'
   const router = useRouter()
   const supabase = createClient()
+  const { providerId } = useProviderId()
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -92,14 +94,19 @@ export default function ScheduleFormPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!providerId) return
     async function load() {
-      const [{ data: cls }, { data: wks }, { data: ndis }] = await Promise.all([
-        supabase.from('clients').select('id, name, address_line1, suburb, state, postcode').eq('active', true).order('name'),
-        supabase.from('carers').select('id, name').eq('active', true).order('name'),
+      const [{ data: clientLinks }, { data: workerLinks }, { data: ndis }] = await Promise.all([
+        supabase.from('provider_clients')
+          .select('client_id, clients(id, name, address_line1, suburb, state, postcode)')
+          .eq('provider_id', providerId).eq('active', true),
+        supabase.from('provider_carers')
+          .select('carer_id, carers(id, name)')
+          .eq('provider_id', providerId).eq('active', true),
         supabase.from('ndis_line_items').select('id, line_item_number, description').eq('active', true),
       ])
-      setClients(cls || [])
-      setWorkers(wks || [])
+      setClients((clientLinks || []).map((l: any) => l.clients).filter(Boolean))
+      setWorkers((workerLinks || []).map((l: any) => l.carers).filter(Boolean))
       setNdisItems(ndis || [])
 
       if (!isNew && id) {
@@ -126,7 +133,7 @@ export default function ScheduleFormPage() {
       setLoading(false)
     }
     load()
-  }, [id])
+  }, [id, providerId])
 
   function handleClientChange(cid: string) {
     setClientId(cid)

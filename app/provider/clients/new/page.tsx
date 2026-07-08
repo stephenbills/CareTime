@@ -63,6 +63,7 @@ export default function NewClientPage() {
         provider_id: provider!.id,
         client_id: clientId,
         active: true,
+        notes: data.comments || null,
       })
     } else {
       // Create new client record
@@ -71,8 +72,7 @@ export default function NewClientPage() {
         mobile: data.mobile || null, address_line1: data.address_line1 || null,
         address_line2: data.address_line2 || null, suburb: data.suburb || null,
         state: data.state || null, postcode: data.postcode || null,
-        ndis_number: data.ndis_number || null, comments: data.comments || null,
-        active: true, provider_id: provider?.id,
+        ndis_number: data.ndis_number || null, provider_id: provider?.id,
       }
 
       const { data: created, error: err } = await supabase
@@ -81,12 +81,13 @@ export default function NewClientPage() {
 
       clientId = created.id
 
-      // Create junction table entry
+      // Create junction table entry — provider-specific notes live here, not on clients.comments
       if (provider?.id) {
         await supabase.from('provider_clients').insert({
           provider_id: provider.id,
           client_id: clientId,
           active: true,
+          notes: data.comments || null,
         })
       }
 

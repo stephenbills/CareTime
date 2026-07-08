@@ -20,9 +20,11 @@ export default function CarersPage() {
     // Get workers linked to this provider via junction table
     const { data: links } = await supabase
       .from('provider_carers')
-      .select('carer_id, carers(*)')
+      .select('carer_id, active, carers(*)')
       .eq('provider_id', providerId)
-    const wks = (links || []).map((l: any) => l.carers).filter(Boolean)
+    const wks = (links || [])
+      .map((l: any) => l.carers ? { ...l.carers, active: l.active } : null)
+      .filter(Boolean)
     setWorkers(wks)
   }
 

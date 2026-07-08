@@ -6,6 +6,7 @@ import { Section, SaveBar } from '@/components/FormFields'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const EMPTY = {
   title: '', description: '', status: 'awaiting_acceptance',
@@ -110,16 +111,22 @@ export default function ActivityPage() {
   const id = params?.id as string
   const isNew = id === 'new' || !id
   const supabase = createClient()
+  const { providerId } = useProviderId()
 
   useEffect(() => {
+    if (!providerId) return
     async function load() {
-      const [{ data: cls }, { data: crs }, { data: ndis }] = await Promise.all([
-        supabase.from('clients').select('id, name, email, address_line1, suburb, state, postcode').eq('active', true).order('name'),
-        supabase.from('carers').select('id, name, email').eq('active', true).order('name'),
+      const [{ data: clientLinks }, { data: carerLinks }, { data: ndis }] = await Promise.all([
+        supabase.from('provider_clients')
+          .select('client_id, clients(id, name, email, address_line1, suburb, state, postcode)')
+          .eq('provider_id', providerId).eq('active', true),
+        supabase.from('provider_carers')
+          .select('carer_id, carers(id, name, email)')
+          .eq('provider_id', providerId).eq('active', true),
         supabase.from('ndis_line_items').select('id, line_item_number, description').eq('active', true),
       ])
-      setClients(cls || [])
-      setCarers(crs || [])
+      setClients((clientLinks || []).map((l: any) => l.clients).filter(Boolean))
+      setCarers((carerLinks || []).map((l: any) => l.carers).filter(Boolean))
       setNdisItems(ndis || [])
 
       if (!isNew) {
@@ -141,7 +148,7 @@ export default function ActivityPage() {
       setLoading(false)
     }
     load()
-  }, [id])
+  }, [id, providerId])
 
   const set = useCallback((field: string, value: string) => {
     setData(prev => ({ ...prev, [field]: value }))

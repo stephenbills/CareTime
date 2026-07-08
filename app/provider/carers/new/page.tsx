@@ -60,6 +60,7 @@ export default function NewCarerPage() {
         provider_id: providerId!,
         carer_id: workerId,
         active: true,
+        notes: data.comments || null,
       })
     } else {
       // Create new worker record
@@ -70,7 +71,6 @@ export default function NewCarerPage() {
         state: data.state || null, postcode: data.postcode || null,
         car_registration: data.car_registration || null, abn: data.abn || null,
         bank_bsb: data.bank_bsb || null, bank_account_number: data.bank_account_number || null,
-        comments: data.comments || null, active: true,
         provider_id: providerId,
       }
 
@@ -80,11 +80,13 @@ export default function NewCarerPage() {
 
       workerId = created.id
 
+      // Create junction table entry — provider-specific notes live here, not on carers.comments
       if (providerId) {
         await supabase.from('provider_carers').insert({
           provider_id: providerId,
           carer_id: workerId,
           active: true,
+          notes: data.comments || null,
         })
       }
 
