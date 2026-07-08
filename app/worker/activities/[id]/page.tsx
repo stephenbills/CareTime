@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, MapPin, Clock, CheckCircle, XCircle, Play, Square, DollarSign, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
+import { RRule } from 'rrule'
 
 const STATUS_COLORS: Record<string, string> = {
   awaiting_acceptance: 'bg-yellow-100 text-yellow-800',
@@ -51,6 +52,7 @@ export default function CarerActivityPage() {
   const [activity, setActivity] = useState<any>(null)
   const [client, setClient] = useState<any>(null)
   const [provider, setProvider] = useState<any>(null)
+  const [recurrenceText, setRecurrenceText] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
   const [error, setError] = useState('')
@@ -79,6 +81,17 @@ export default function CarerActivityPage() {
     ])
     setClient(cl)
     setProvider(prov)
+
+    if (act.recurring_schedule_id) {
+      const { data: schedule } = await supabase
+        .from('recurring_schedules').select('rrule').eq('id', act.recurring_schedule_id).maybeSingle()
+      if (schedule?.rrule) {
+        try { setRecurrenceText(RRule.fromString(schedule.rrule).toText()) } catch { setRecurrenceText(null) }
+      }
+    } else {
+      setRecurrenceText(null)
+    }
+
     setLoading(false)
   }
 
@@ -204,10 +217,15 @@ export default function CarerActivityPage() {
       </div>
 
       {/* Status badge */}
-      <div className="flex">
+      <div className="flex gap-2">
         <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${STATUS_COLORS[status]}`}>
           {STATUS_LABELS[status]}
         </span>
+        {activity.recurring_schedule_id && (
+          <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-medium">
+            Recurring
+          </span>
+        )}
       </div>
 
       {/* Accept / Decline buttons */}
@@ -351,6 +369,20 @@ export default function CarerActivityPage() {
           <div className="text-sm text-gray-600">
             <span className="text-gray-400 text-xs block mb-0.5">Client</span>
             <span className="font-medium">{client.name}</span>
+          </div>
+        )}
+
+        {provider && (
+          <div className="text-sm text-gray-600">
+            <span className="text-gray-400 text-xs block mb-0.5">Provider</span>
+            <span className="font-medium">{provider.name}</span>
+          </div>
+        )}
+
+        {recurrenceText && (
+          <div className="text-sm text-gray-600">
+            <span className="text-gray-400 text-xs block mb-0.5">Recurrence</span>
+            <span className="font-medium">{recurrenceText}</span>
           </div>
         )}
 

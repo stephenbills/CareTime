@@ -79,7 +79,7 @@ export default function CarerDashboard() {
 
       setTodayActs(today || [])
       setUpcoming(future || [])
-      setAwaitingCount((today || []).filter((a: any) => a.status === 'awaiting_acceptance').length)
+      setAwaitingCount([...(today || []), ...(future || [])].filter((a: any) => a.status === 'awaiting_acceptance').length)
       setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
       setLoading(false)
     }
