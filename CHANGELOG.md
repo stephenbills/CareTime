@@ -4,6 +4,17 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 33 — 8 July 2026
+
+### Recurring Provider Activities, Multi-Provider Client Requests, Notify-on-Details-Save
+
+- Provider "Add Activity" now supports recurrence (new only) — creates a `recurring_schedules` definition plus the next 4 weeks of `activities`, same pattern as the Client request form
+- Client "Add Activity" now shows a Provider dropdown when linked to more than one Provider (plain text if only one); Preferred Worker and NDIS Support Type are scoped to the selected Provider via `provider_carers`/`ndis_line_items`, replacing the legacy `clients.provider_id` lookup
+- Client "Add Activity" layout: unified "Shift Time" (Start Date, Start Time, End Time) replaces the old one-off/recurring fork and the recurring "Duration" dropdown; overnight is auto-detected when End Time ≤ Start Time. Recurrence now sits below Shift Time
+- `RecurrencePicker` now renders its own "current recurrence" summary internally, so every page using it gets the summary for free instead of duplicating the block
+- Verified: Client and Worker calendars already show activities across every linked Provider (no `provider_id` filter existed) — no change needed
+- Saving "My Details" (Client or Worker) now notifies linked Providers of the change (`details_updated` email). With 2+ Providers, a modal asks whether to notify all or a selection before saving — Cancel aborts the save entirely. With one Provider, it's notified automatically; with none, no notification is sent
+
 ## Session 32 — 8 July 2026
 
 ### Split Shared vs Provider-Specific Data for Clients and Workers

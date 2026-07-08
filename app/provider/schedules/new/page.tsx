@@ -76,7 +76,6 @@ export default function ScheduleFormPage() {
   const [carerId, setCarerId] = useState('')
   const [ndisItemId, setNdisItemId] = useState('')
   const [rruleStr, setRruleStr] = useState<string | null>(null)
-  const [rruleDesc, setRruleDesc] = useState('Does not repeat')
   const [startTime, setStartTime] = useState('09:00')
   const [durationMins, setDurationMins] = useState(120)
   const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10))
@@ -233,14 +232,9 @@ export default function ScheduleFormPage() {
           <h2 className="font-semibold text-gray-900">Recurrence Pattern</h2>
           <RecurrencePicker
             startDate={validFrom ? new Date(validFrom) : new Date()}
-            onChange={(str, desc) => { setRruleStr(str); setRruleDesc(desc) }}
+            onChange={str => setRruleStr(str)}
             initialRRule={initialRRule}
           />
-          {rruleStr && (
-            <div className="bg-blue-50 rounded-lg px-3 py-2 text-sm text-blue-700">
-              {rruleDesc}
-            </div>
-          )}
         </div>
 
         {/* Shift time */}

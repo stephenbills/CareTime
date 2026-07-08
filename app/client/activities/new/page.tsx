@@ -9,18 +9,6 @@ import RecurrencePicker from '@/components/RecurrencePicker'
 import { RRule } from 'rrule'
 import { Suspense } from 'react'
 
-const DURATIONS = [
-  { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
-  { label: '1.5 hours', value: 90 }, { label: '2 hours', value: 120 },
-  { label: '2.5 hours', value: 150 }, { label: '3 hours', value: 180 },
-  { label: '3.5 hours', value: 210 }, { label: '4 hours', value: 240 },
-  { label: '4.5 hours', value: 270 }, { label: '5 hours', value: 300 },
-  { label: '5.5 hours', value: 330 }, { label: '6 hours', value: 360 },
-  { label: '6.5 hours', value: 390 }, { label: '7 hours', value: 420 },
-  { label: '7.5 hours', value: 450 }, { label: '8 hours', value: 480 },
-  { label: '10 hours', value: 600 }, { label: '12 hours', value: 720 },
-]
-
 // Generate time options in 15-min increments
 function timeOptions() {
   const opts = []
@@ -42,6 +30,16 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
+// Minutes from start to end, rolling over to the next day if end <= start
+function shiftDurationMinutes(startTimeStr: string, endTimeStr: string) {
+  const [sh, sm] = startTimeStr.split(':').map(Number)
+  const [eh, em] = endTimeStr.split(':').map(Number)
+  const startMins = sh * 60 + sm
+  const endMins = eh * 60 + em
+  const diff = endMins - startMins
+  return diff <= 0 ? diff + 24 * 60 : diff
+}
+
 function ClientNewActivityInner() {
   const searchParams = useSearchParams()
   const dateParam = searchParams?.get('date')
@@ -51,17 +49,13 @@ function ClientNewActivityInner() {
   const [carerId, setCarerId] = useState('')
   const [ndisItemId, setNdisItemId] = useState('')
 
-  // One-off timing — separate date and time fields
+  // Shift Time — start date/time + end time; overnight is auto-detected
   const [startDate, setStartDate] = useState(defaultDate)
   const [startTimeVal, setStartTimeVal] = useState('09:00')
-  const [endDate, setEndDate] = useState(defaultDate)
   const [endTimeVal, setEndTimeVal] = useState('11:00')
 
   // Recurrence
   const [rruleStr, setRruleStr] = useState<string | null>(null)
-  const [rruleDesc, setRruleDesc] = useState('Does not repeat')
-  const [recurTime, setRecurTime] = useState('09:00')
-  const [durationMins, setDurationMins] = useState(120)
 
   // Locations
   const [pickupAddress, setPickupAddress] = useState('')
@@ -72,9 +66,8 @@ function ClientNewActivityInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [clientId, setClientId] = useState<string | null>(null)
-  const [providerId, setProviderId] = useState<string | null>(null)
-  const [providerEmail, setProviderEmail] = useState<string | null>(null)
-  const [providerName, setProviderName] = useState<string | null>(null)
+  const [providers, setProviders] = useState<{ id: string; name: string; email: string | null }[]>([])
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('')
   const [workers, setWorkers] = useState<any[]>([])
   const [ndisItems, setNdisItems] = useState<any[]>([])
 
@@ -94,44 +87,45 @@ function ClientNewActivityInner() {
         .filter(Boolean).join(', ')
       if (addr) { setPickupAddress(addr); setDropoffAddress(addr) }
 
-      // Load provider details
-      if (client.provider_id) {
-        const { data: prov } = await supabase
-          .from('providers').select('id, name, email').eq('id', client.provider_id).maybeSingle()
-        if (prov) {
-          setProviderId(prov.id)
-          setProviderEmail(prov.email)
-          setProviderName(prov.name)
-        }
-      }
-
-      // Load workers and NDIS items independently — always show even if no provider link
-      const [{ data: wks }, { data: ndis }] = await Promise.all([
-        supabase.from('carers').select('id, name').eq('active', true).order('name'),
-        client.provider_id
-          ? supabase.from('ndis_line_items').select('id, line_item_number, description')
-              .eq('provider_id', client.provider_id).eq('active', true)
-          : supabase.from('ndis_line_items').select('id, line_item_number, description')
-              .eq('active', true),
-      ])
-      setWorkers(wks || [])
-      setNdisItems(ndis || [])
+      const { data: links } = await supabase
+        .from('provider_clients')
+        .select('provider_id, providers(id, name, email)')
+        .eq('client_id', client.id).eq('active', true)
+      const provs = (links || []).map((l: any) => l.providers).filter(Boolean)
+      setProviders(provs)
+      if (provs.length > 0) setSelectedProviderId(provs[0].id)
     }
     load()
   }, [])
 
-  const isRecurring = rruleStr !== null
-
-  // Auto-set end date when start time > end time (overnight)
-  function handleStartTimeChange(val: string) {
-    setStartTimeVal(val)
-    if (val > endTimeVal && startDate === endDate) {
-      // If new start is after end on same day, assume overnight — push end to next day
-      const nextDay = new Date(startDate)
-      nextDay.setDate(nextDay.getDate() + 1)
-      setEndDate(nextDay.toISOString().slice(0, 10))
+  // Scope Preferred Worker + NDIS Support Type to the selected Provider
+  useEffect(() => {
+    async function loadScoped() {
+      if (selectedProviderId) {
+        const [{ data: workerLinks }, { data: ndis }] = await Promise.all([
+          supabase.from('provider_carers')
+            .select('carer_id, carers(id, name)')
+            .eq('provider_id', selectedProviderId).eq('active', true),
+          supabase.from('ndis_line_items').select('id, line_item_number, description')
+            .eq('provider_id', selectedProviderId).eq('active', true),
+        ])
+        setWorkers((workerLinks || []).map((l: any) => l.carers).filter(Boolean))
+        setNdisItems(ndis || [])
+      } else {
+        // No linked Provider yet — fall back to an unscoped list rather than showing nothing
+        const [{ data: wks }, { data: ndis }] = await Promise.all([
+          supabase.from('carers').select('id, name').eq('active', true).order('name'),
+          supabase.from('ndis_line_items').select('id, line_item_number, description').eq('active', true),
+        ])
+        setWorkers(wks || [])
+        setNdisItems(ndis || [])
+      }
     }
-  }
+    loadScoped()
+  }, [selectedProviderId])
+
+  const isRecurring = rruleStr !== null
+  const selectedProvider = providers.find(p => p.id === selectedProviderId)
 
   function buildDateTime(dateStr: string, timeStr: string) {
     return new Date(`${dateStr}T${timeStr}:00`)
@@ -155,16 +149,13 @@ function ClientNewActivityInner() {
     setError('')
     if (!title.trim()) { setError('Activity title is required'); return }
     if (!clientId) { setError('Your profile is not set up. Contact your Provider.'); return }
-
-    if (!isRecurring) {
-      if (!startDate || !startTimeVal) { setError('Start date and time are required'); return }
-      if (!endDate || !endTimeVal) { setError('End date and time are required'); return }
-      const s = buildDateTime(startDate, startTimeVal)
-      const en = buildDateTime(endDate, endTimeVal)
-      if (s >= en) { setError('End must be after start'); return }
-    }
+    if (!startDate || !startTimeVal || !endTimeVal) { setError('Start date and shift time are required'); return }
 
     setSaving(true)
+    const durationMin = shiftDurationMinutes(startTimeVal, endTimeVal)
+    const providerId = selectedProviderId || null
+    const providerEmail = selectedProvider?.email || null
+    const providerName = selectedProvider?.name || null
 
     if (isRecurring) {
       let daysOfWeek: number[] = []
@@ -188,8 +179,8 @@ function ClientNewActivityInner() {
         ndis_line_item_id: ndisItemId || null,
         rrule: rruleStr,
         days_of_week: daysOfWeek.length > 0 ? daysOfWeek : null,
-        start_time: recurTime,
-        duration_minutes: durationMins,
+        start_time: startTimeVal,
+        duration_minutes: durationMin,
         valid_from: new Date().toISOString().slice(0, 10),
         pickup_address: pickupAddress || null,
         dropoff_address: dropoffAddress || null,
@@ -200,7 +191,7 @@ function ClientNewActivityInner() {
       if (err) { setError(err.message); setSaving(false); return }
 
       if (created) {
-        const occurrences = generateOccurrences(rruleStr!, recurTime, durationMins)
+        const occurrences = generateOccurrences(rruleStr!, startTimeVal, durationMin)
         if (occurrences.length > 0) {
           await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
             recurring_schedule_id: created.id,
@@ -230,7 +221,7 @@ function ClientNewActivityInner() {
       }
     } else {
       const s = buildDateTime(startDate, startTimeVal)
-      const en = buildDateTime(endDate, endTimeVal)
+      const en = new Date(s.getTime() + durationMin * 60000)
 
       const { data: created, error: err } = await supabase.from('activities').insert({
         title: title.trim(),
@@ -296,6 +287,24 @@ function ClientNewActivityInner() {
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
 
+          {/* Provider — dropdown if linked to more than one, otherwise just the name */}
+          {providers.length > 1 ? (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Provider</label>
+              <select value={selectedProviderId} onChange={e => setSelectedProviderId(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          ) : providers.length === 1 ? (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Provider</label>
+              <p className="text-sm font-medium text-gray-900">{providers[0].name}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-amber-600">You are not yet linked to a Provider. Contact your Provider for an invite.</p>
+          )}
+
           {/* Worker — always show */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
@@ -326,77 +335,43 @@ function ClientNewActivityInner() {
           </div>
         </div>
 
+        {/* Shift Time */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+          <h2 className="font-semibold text-gray-900 text-sm">Shift Time</h2>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Date</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Time</label>
+              <select value={startTimeVal} onChange={e => setStartTimeVal(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                {TIME_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">End Time</label>
+              <select value={endTimeVal} onChange={e => setEndTimeVal(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                {TIME_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+          </div>
+          {endTimeVal <= startTimeVal && (
+            <p className="text-xs text-amber-600">⚠ End time is before start time — this will be treated as an overnight shift ending the next day.</p>
+          )}
+        </div>
+
         {/* Recurrence */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
           <h2 className="font-semibold text-gray-900 text-sm">Recurrence</h2>
           <RecurrencePicker
             startDate={startDate ? new Date(startDate) : new Date()}
-            onChange={(str, desc) => { setRruleStr(str); setRruleDesc(desc) }}
+            onChange={str => setRruleStr(str)}
           />
-          {isRecurring && (
-            <div className="bg-blue-50 rounded-xl px-3 py-2 text-xs text-blue-700">
-              {rruleDesc}
-            </div>
-          )}
         </div>
-
-        {/* Timing — one-off uses date + time dropdowns, recurring uses time + duration */}
-        {!isRecurring ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-            <h2 className="font-semibold text-gray-900 text-sm">When</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Date</label>
-                <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); if (!endDate || endDate < e.target.value) setEndDate(e.target.value) }}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Time</label>
-                <select value={startTimeVal} onChange={e => handleStartTimeChange(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                  {TIME_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">End Date</label>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">End Time</label>
-                <select value={endTimeVal} onChange={e => setEndTimeVal(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                  {TIME_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-            </div>
-            {startDate === endDate && startTimeVal > endTimeVal && (
-              <p className="text-xs text-amber-600">⚠ End time is before start time — set the end date to the next day for an overnight shift.</p>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-            <h2 className="font-semibold text-gray-900 text-sm">Shift Time</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Time</label>
-                <select value={recurTime} onChange={e => setRecurTime(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                  {TIME_OPTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Duration</label>
-                <select value={String(durationMins)} onChange={e => setDurationMins(Number(e.target.value))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                  {DURATIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Locations */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { notify } from '@/lib/email/notify'
 
 function Field({ label, value, onChange, type = 'text', required = false }: {
   label: string; value: string; onChange: (v: string) => void
@@ -24,13 +25,19 @@ const EMPTY = {
   ndis_number: '',
 }
 
+type Provider = { id: string; name: string; email: string | null }
+
 export default function ClientDetails() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [clientId, setClientId] = useState<string | null>(null)
+  const [providers, setProviders] = useState<Provider[]>([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showNotifyModal, setShowNotifyModal] = useState(false)
+  const [notifyMode, setNotifyMode] = useState<'all' | 'selected'>('all')
+  const [selectedProviderIds, setSelectedProviderIds] = useState<Set<string>>(new Set())
   const supabase = createClient()
 
   useEffect(() => {
@@ -46,6 +53,12 @@ export default function ClientDetails() {
           next[key] = client[key] == null ? '' : String(client[key])
         }
         setData(next)
+
+        const { data: links } = await supabase
+          .from('provider_clients')
+          .select('provider_id, providers(id, name, email)')
+          .eq('client_id', client.id).eq('active', true)
+        setProviders((links || []).map((l: any) => l.providers).filter(Boolean))
       }
       setLoading(false)
     }
@@ -55,9 +68,34 @@ export default function ClientDetails() {
   const set = (field: string, value: string) =>
     setData(prev => ({ ...prev, [field]: value }))
 
+  function toggleProvider(id: string) {
+    setSelectedProviderIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function chooseSelected() {
+    setNotifyMode('selected')
+    setSelectedProviderIds(new Set(providers.map(p => p.id)))
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (!clientId) { setError('Profile not found. Contact your Provider.'); return }
+
+    if (providers.length > 1) {
+      setNotifyMode('all')
+      setShowNotifyModal(true)
+      return
+    }
+
+    await performSave(providers)
+  }
+
+  async function performSave(providersToNotify: Provider[]) {
     setSaving(true)
 
     const payload = {
@@ -73,13 +111,31 @@ export default function ClientDetails() {
       ndis_number: data.ndis_number || null,
     }
 
-    if (!clientId) { setError('Profile not found. Contact your Provider.'); setSaving(false); return }
-
-    const { error: err } = await supabase.from('clients').update(payload).eq('id', clientId)
+    const { error: err } = await supabase.from('clients').update(payload).eq('id', clientId!)
     if (err) { setError(err.message); setSaving(false); return }
+
+    for (const p of providersToNotify) {
+      if (p.email) {
+        notify('details_updated', p.email, {
+          recipientName: p.name,
+          personName: data.name,
+          role: 'client',
+          profileUrl: `${window.location.origin}/provider/clients/${clientId}`,
+        })
+      }
+    }
+
     setSaving(false)
     setSaved(true)
+    setShowNotifyModal(false)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  function handleConfirmNotify() {
+    const toNotify = notifyMode === 'all'
+      ? providers
+      : providers.filter(p => selectedProviderIds.has(p.id))
+    performSave(toNotify)
   }
 
   if (loading) return (
@@ -124,6 +180,53 @@ export default function ClientDetails() {
           {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Changes'}
         </button>
       </form>
+
+      {showNotifyModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 space-y-4">
+              <h2 className="text-lg font-bold text-gray-900">Notify your Providers?</h2>
+              <p className="text-sm text-gray-600">
+                You're linked to multiple Providers. Who should be notified about this update?
+              </p>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="radio" checked={notifyMode === 'all'} onChange={() => setNotifyMode('all')}
+                    className="w-4 h-4 accent-blue-600" />
+                  <span className="text-sm text-gray-700">All Providers</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="radio" checked={notifyMode === 'selected'} onChange={chooseSelected}
+                    className="w-4 h-4 accent-blue-600" />
+                  <span className="text-sm text-gray-700">Selected Providers</span>
+                </label>
+                {notifyMode === 'selected' && (
+                  <div className="space-y-2 pl-7">
+                    {providers.map(p => (
+                      <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={selectedProviderIds.has(p.id)}
+                          onChange={() => toggleProvider(p.id)}
+                          className="w-4 h-4 accent-blue-600 rounded" />
+                        <span className="text-sm text-gray-700">{p.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <button type="button" onClick={() => setShowNotifyModal(false)}
+                className="px-5 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={handleConfirmNotify} disabled={saving}
+                className="px-5 py-2 bg-blue-600 text-white rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save & Notify'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -21,6 +21,7 @@ const TEMPLATE_MAP: Record<string, (data: any) => { subject: string; html: strin
   invoice_generated: templates.invoiceGeneratedEmail,
   provider_relationship_request: templates.providerRelationshipRequestEmail,
   welcome: templates.welcomeEmail,
+  details_updated: templates.detailsUpdatedEmail,
 }
 
 export async function POST(req: NextRequest) {

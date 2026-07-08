@@ -7,6 +7,8 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
 import { useProviderId } from '@/lib/hooks/useProvider'
+import RecurrencePicker from '@/components/RecurrencePicker'
+import { RRule } from 'rrule'
 
 const EMPTY = {
   title: '', description: '', status: 'awaiting_acceptance',
@@ -96,6 +98,20 @@ function formatDateTime(iso: string) {
   })
 }
 
+function generateOccurrences(rruleString: string, startDateTimeStr: string, durationMin: number) {
+  const startDT = new Date(startDateTimeStr)
+  const rule = RRule.fromString(rruleString)
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const until = new Date(now); until.setDate(until.getDate() + 28)
+  const occurrences = rule.between(now, until, true)
+  const sh = startDT.getHours(), sm = startDT.getMinutes()
+  return occurrences.map(occ => {
+    const start = new Date(occ); start.setHours(sh, sm, 0, 0)
+    const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
+    return { start, end }
+  })
+}
+
 export default function ActivityPage() {
   const [data, setData] = useState<Record<string, string>>(EMPTY)
   const [saving, setSaving] = useState(false)
@@ -105,6 +121,7 @@ export default function ActivityPage() {
   const [clients, setClients] = useState<any[]>([])
   const [carers, setCarers] = useState<any[]>([])
   const [ndisItems, setNdisItems] = useState<any[]>([])
+  const [rruleStr, setRruleStr] = useState<string | null>(null)
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -212,7 +229,77 @@ export default function ActivityPage() {
     const selectedClient = clients.find(c => c.id === data.client_id)
     const selectedCarer = carers.find(c => c.id === data.carer_id)
 
-    if (isNew) {
+    if (isNew && rruleStr) {
+      let daysOfWeek: number[] = []
+      try {
+        const rule = RRule.fromString(rruleStr)
+        const byDay = rule.origOptions.byweekday
+        if (byDay) {
+          daysOfWeek = (byDay as any[]).map((d: any) => {
+            const wd = typeof d === 'number' ? d : (d.weekday ?? d)
+            return (wd + 1) % 7
+          })
+        }
+      } catch {}
+
+      const startDT = new Date(data.start_time)
+      const durationMin = Math.round((new Date(data.end_time).getTime() - startDT.getTime()) / 60000)
+      const startTimeStr = `${String(startDT.getHours()).padStart(2, '0')}:${String(startDT.getMinutes()).padStart(2, '0')}`
+
+      const { data: created, error: err } = await supabase.from('recurring_schedules').insert({
+        title: data.title,
+        description: data.description || null,
+        provider_id: provider?.id || null,
+        client_id: data.client_id || null,
+        carer_id: data.carer_id || null,
+        ndis_line_item_id: data.ndis_line_item_id || null,
+        rrule: rruleStr,
+        days_of_week: daysOfWeek.length > 0 ? daysOfWeek : null,
+        start_time: startTimeStr,
+        duration_minutes: durationMin,
+        valid_from: data.start_time.slice(0, 10),
+        pickup_address: data.pickup_address || null,
+        dropoff_address: data.dropoff_address || null,
+        venue_address: data.venue_address || null,
+        active: true,
+      }).select().single()
+
+      if (err) { setError(err.message); setSaving(false); return }
+
+      if (created) {
+        const occurrences = generateOccurrences(rruleStr, data.start_time, durationMin)
+        if (occurrences.length > 0) {
+          await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
+            recurring_schedule_id: created.id,
+            provider_id: provider?.id || null,
+            client_id: data.client_id || null,
+            carer_id: data.carer_id || null,
+            ndis_line_item_id: data.ndis_line_item_id || null,
+            title: data.title,
+            description: data.description || null,
+            status: 'awaiting_acceptance',
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            pickup_address: data.pickup_address || null,
+            dropoff_address: data.dropoff_address || null,
+            venue_address: data.venue_address || null,
+          })))
+        }
+
+        if (selectedCarer?.email) {
+          notify('activity_assigned', selectedCarer.email, {
+            carerName: selectedCarer.name,
+            activityTitle: `${data.title} (recurring schedule)`,
+            clientName: selectedClient?.name || '—',
+            startTime: formatDateTime(data.start_time),
+            endTime: formatDateTime(data.end_time),
+            activityId: created.id,
+          })
+        }
+
+        router.push('/provider/schedules')
+      }
+    } else if (isNew) {
       const { data: created, error: err } = await supabase
         .from('activities').insert(payload).select().single()
       if (err) { setError(err.message); setSaving(false); return }
@@ -345,8 +432,10 @@ export default function ActivityPage() {
               options={carerOptions} half />
             <Select label="NDIS Line Item" value={data.ndis_line_item_id}
               onChange={v => set('ndis_line_item_id', v)} options={ndisOptions} />
-            <Select label="Status" value={data.status} onChange={v => set('status', v)}
-              options={STATUS_OPTIONS} required />
+            {!(isNew && rruleStr) && (
+              <Select label="Status" value={data.status} onChange={v => set('status', v)}
+                options={STATUS_OPTIONS} required />
+            )}
             <TextArea label="Description / Notes" value={data.description}
               onChange={v => set('description', v)} placeholder="Optional notes about this activity" />
           </div>
@@ -360,6 +449,15 @@ export default function ActivityPage() {
               onChange={v => set('end_time', v)} type="datetime-local" required half />
           </div>
         </Section>
+
+        {isNew && (
+          <Section title="Recurrence">
+            <RecurrencePicker
+              startDate={data.start_time ? new Date(data.start_time) : new Date()}
+              onChange={str => setRruleStr(str)}
+            />
+          </Section>
+        )}
 
         <Section title="Locations">
           <div className="grid grid-cols-2 gap-4">

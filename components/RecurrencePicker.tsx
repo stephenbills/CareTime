@@ -42,6 +42,7 @@ export default function RecurrencePicker({ startDate, onChange, initialRRule }: 
 
   const [selected, setSelected] = useState<PresetKey>('none')
   const [showModal, setShowModal] = useState(false)
+  const [description, setDescription] = useState('Does not repeat')
 
   // Custom options
   const [freq, setFreq] = useState(RRule.WEEKLY)
@@ -76,6 +77,7 @@ export default function RecurrencePicker({ startDate, onChange, initialRRule }: 
       }
       if (opts.until) { setEndType('until'); setUntilDate(opts.until.toISOString().slice(0, 10)) }
       else if (opts.count) { setEndType('count'); setCount(opts.count) }
+      setDescription(rule.toText())
     } catch {}
   }, [initialRRule])
 
@@ -113,11 +115,13 @@ export default function RecurrencePicker({ startDate, onChange, initialRRule }: 
     }
     setShowModal(false)
     const { str, desc } = buildRule(key)
+    setDescription(desc)
     onChange(str, desc)
   }
 
   function handleCustomDone() {
     const { str, desc } = buildRule('custom')
+    setDescription(desc)
     onChange(str, desc)
     setShowModal(false)
   }
@@ -125,6 +129,7 @@ export default function RecurrencePicker({ startDate, onChange, initialRRule }: 
   function handleCustomCancel() {
     setSelected('none')
     setShowModal(false)
+    setDescription('Does not repeat')
     onChange(null, 'Does not repeat')
   }
 
@@ -140,6 +145,13 @@ export default function RecurrencePicker({ startDate, onChange, initialRRule }: 
       >
         {presets.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
       </select>
+
+      {/* Summary of the current recurrence */}
+      {selected !== 'none' && !showModal && (
+        <div className="bg-blue-50 rounded-xl px-3 py-2 text-xs text-blue-700 mt-2">
+          {description}
+        </div>
+      )}
 
       {/* Custom recurrence description when custom is selected and modal closed */}
       {selected === 'custom' && !showModal && (

@@ -288,3 +288,15 @@ export function welcomeEmail(opts: {
   `
   return { subject: 'Welcome to CareTime', html: wrapper(content) }
 }
+
+export function detailsUpdatedEmail(opts: {
+  recipientName: string; personName: string; role: 'client' | 'worker'; profileUrl: string
+}) {
+  const roleLabel = opts.role === 'client' ? 'Client' : 'Worker'
+  const content = `
+    ${heading(`${roleLabel} Details Updated`)}
+    ${paragraph(`Hi ${opts.recipientName}, ${opts.personName} has updated their details.`)}
+    ${button('View Profile', opts.profileUrl)}
+  `
+  return { subject: `${opts.personName} updated their details`, html: wrapper(content) }
+}
