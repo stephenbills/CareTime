@@ -23,6 +23,13 @@ function duration(start: string, end: string) {
   return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}`.trim() : `${m}m`
 }
 
+function toLocalDateTimeInput(iso: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function ClientActivityPage() {
   const [activity, setActivity] = useState<any>(null)
   const [worker, setWorker] = useState<any>(null)
@@ -164,8 +171,8 @@ export default function ClientActivityPage() {
     setEditData({
       title: activity.title || '',
       description: activity.description || '',
-      start_time: activity.start_time?.slice(0, 16) || '',
-      end_time: activity.end_time?.slice(0, 16) || '',
+      start_time: toLocalDateTimeInput(activity.start_time),
+      end_time: toLocalDateTimeInput(activity.end_time),
     })
   }
 
@@ -445,7 +452,14 @@ export default function ClientActivityPage() {
 
       {/* Shift details */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <h2 className="font-semibold text-gray-900 text-sm">Shift Details</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900 text-sm">Shift Details</h2>
+          {activity.recurring_schedule_id && (
+            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+              Recurring
+            </span>
+          )}
+        </div>
 
         <div className="flex items-start gap-2 text-sm text-gray-600">
           <Clock size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />

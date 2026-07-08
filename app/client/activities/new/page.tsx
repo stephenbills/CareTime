@@ -131,11 +131,16 @@ function ClientNewActivityInner() {
     return new Date(`${dateStr}T${timeStr}:00`)
   }
 
-  function generateOccurrences(rruleString: string, startTimeStr: string, durationMin: number) {
+  function generateOccurrences(rruleString: string, startDateStr: string, startTimeStr: string, durationMin: number) {
     const rule = RRule.fromString(rruleString)
-    const now = new Date(); now.setHours(0, 0, 0, 0)
-    const until = new Date(now); until.setDate(until.getDate() + 28)
-    const occurrences = rule.between(now, until, true)
+    // Anchor the search window to the chosen start date, not "today" — otherwise a
+    // future start date gets skipped in favour of this week's matching weekday,
+    // or (if the start date is more than 4 weeks out) no occurrences are found at all.
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const chosenStart = new Date(`${startDateStr}T00:00:00`)
+    const searchStart = today > chosenStart ? today : chosenStart
+    const until = new Date(searchStart); until.setDate(until.getDate() + 28)
+    const occurrences = rule.between(searchStart, until, true)
     const [sh, sm] = startTimeStr.split(':').map(Number)
     return occurrences.map(occ => {
       const start = new Date(occ); start.setHours(sh, sm, 0, 0)
@@ -181,7 +186,7 @@ function ClientNewActivityInner() {
         days_of_week: daysOfWeek.length > 0 ? daysOfWeek : null,
         start_time: startTimeVal,
         duration_minutes: durationMin,
-        valid_from: new Date().toISOString().slice(0, 10),
+        valid_from: startDate,
         pickup_address: pickupAddress || null,
         dropoff_address: dropoffAddress || null,
         venue_address: venueAddress || null,
@@ -191,7 +196,7 @@ function ClientNewActivityInner() {
       if (err) { setError(err.message); setSaving(false); return }
 
       if (created) {
-        const occurrences = generateOccurrences(rruleStr!, startTimeVal, durationMin)
+        const occurrences = generateOccurrences(rruleStr!, startDate, startTimeVal, durationMin)
         if (occurrences.length > 0) {
           await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
             recurring_schedule_id: created.id,

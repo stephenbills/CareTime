@@ -101,9 +101,14 @@ function formatDateTime(iso: string) {
 function generateOccurrences(rruleString: string, startDateTimeStr: string, durationMin: number) {
   const startDT = new Date(startDateTimeStr)
   const rule = RRule.fromString(rruleString)
-  const now = new Date(); now.setHours(0, 0, 0, 0)
-  const until = new Date(now); until.setDate(until.getDate() + 28)
-  const occurrences = rule.between(now, until, true)
+  // Anchor the search window to the chosen start date, not "today" — otherwise a
+  // future start date gets skipped in favour of this week's matching weekday,
+  // or (if the start date is more than 4 weeks out) no occurrences are found at all.
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const chosenStart = new Date(startDT); chosenStart.setHours(0, 0, 0, 0)
+  const searchStart = today > chosenStart ? today : chosenStart
+  const until = new Date(searchStart); until.setDate(until.getDate() + 28)
+  const occurrences = rule.between(searchStart, until, true)
   const sh = startDT.getHours(), sm = startDT.getMinutes()
   return occurrences.map(occ => {
     const start = new Date(occ); start.setHours(sh, sm, 0, 0)
