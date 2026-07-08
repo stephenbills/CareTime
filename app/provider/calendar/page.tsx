@@ -73,11 +73,12 @@ function CalendarInner() {
     const to = new Date(year, month + 2, 0, 23, 59, 59).toISOString()
     const [{ data: acts }, { data: cls }, { data: crs }] = await Promise.all([
       supabase.from('activities').select('*').eq('provider_id', providerId).gte('start_time', from).lte('start_time', to).order('start_time'),
-      supabase.from('clients').select('id, name').eq('active', true).eq('provider_id', providerId),
+      supabase.from('provider_clients').select('client_id, clients(id, name)').eq('provider_id', providerId).eq('active', true),
       supabase.from('provider_carers').select('carer_id, carers(id, name)').eq('provider_id', providerId).eq('active', true),
     ])
     setActivities(acts || [])
-    setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
+    const clientList = (cls || []).map((pc: any) => pc.clients).filter(Boolean)
+    setClients(Object.fromEntries(clientList.map((c: any) => [c.id, c.name])))
     const wks = (crs || []).map((pc: any) => pc.carers).filter(Boolean)
     setCarers(Object.fromEntries(wks.map((w: any) => [w.id, w.name])))
   }

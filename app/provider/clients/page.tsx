@@ -13,10 +13,17 @@ export default function ClientsPage() {
   const { providerId } = useProviderId()
   const supabase = createClient()
 
-  useEffect(() => {
-    if (providerId) supabase.from('clients').select('*').eq('provider_id', providerId).order('name')
-      .then(({ data }) => setClients(data || []))
-  }, [providerId])
+  useEffect(() => { if (providerId) loadClients() }, [providerId])
+
+  async function loadClients() {
+    if (!providerId) return
+    const { data: links } = await supabase
+      .from('provider_clients')
+      .select('client_id, clients(*)')
+      .eq('provider_id', providerId)
+    const cls = (links || []).map((l: any) => l.clients).filter(Boolean)
+    setClients(cls)
+  }
 
   async function sendInvite(client: any) {
     if (!client.email) return
@@ -28,8 +35,7 @@ export default function ClientsPage() {
     })
     if (res.ok) {
       setInvitedIds(prev => new Set([...prev, client.id]))
-      const { data } = await supabase.from('clients').select('*').eq('provider_id', providerId!).order('name')
-      setClients(data || [])
+      await loadClients()
     }
     setInviting(null)
   }

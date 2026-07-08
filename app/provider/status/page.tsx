@@ -41,11 +41,12 @@ export default function StatusPage() {
     if (!providerId) return
     const [{ data: acts }, { data: cls }, { data: wks }] = await Promise.all([
       supabase.from('activities').select('*').eq('provider_id', providerId).order('start_time', { ascending: false }).limit(200),
-      supabase.from('clients').select('id, name').eq('provider_id', providerId),
+      supabase.from('provider_clients').select('client_id, clients(id, name)').eq('provider_id', providerId).eq('active', true),
       supabase.from('provider_carers').select('carer_id, carers(id, name)').eq('provider_id', providerId),
     ])
     setActivities(acts || [])
-    setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
+    const clientList = (cls || []).map((pc: any) => pc.clients).filter(Boolean)
+    setClients(Object.fromEntries(clientList.map((c: any) => [c.id, c.name])))
     const workers = (wks || []).map((pc: any) => pc.carers).filter(Boolean)
     setWorkers(Object.fromEntries(workers.map((w: any) => [w.id, w.name])))
     setLoading(false)

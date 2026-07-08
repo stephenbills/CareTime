@@ -4,6 +4,95 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 31 — 8 July 2026
+
+### Junction Table Consistency
+
+- All Provider pages (dashboard, clients list, calendar, status, invoices, schedules) now query clients via `provider_clients` junction table, not `clients.provider_id`
+- Adding an existing client or worker (by email) links them via the junction table instead of creating a duplicate row
+- Client dashboard, calendar, and notes query ALL client records for the user, showing activities across all providers
+- Recurring activity delete modal: "This activity only" or "This and all future activities"
+- PDF invoice generation using pdf-lib, attached to Brevo email as A4 PDF
+
+## Session 30 — 7 July 2026
+
+### Multi-Provider Clients, PDF Invoices, Recurring Delete
+
+- `provider_clients` junction table for clients across multiple providers
+- PDF invoice generator with A4 layout, line items table, totals, provider/client details
+- PDF attached to invoice email via Brevo attachment API
+- Recurring delete modal with "this only" vs "this and all future" options
+- Client/Worker add forms check for existing email before creating duplicates
+
+## Session 29 — 7 July 2026
+
+### Provider Data Isolation & Multi-Provider Workers
+
+- `provider_carers` junction table for workers across multiple providers
+- All Provider queries scoped by `provider_id` — dashboard, clients, workers, calendar, schedules, invoices, status
+- `useProviderId()` hook for consistent provider context across all pages
+- Multi-provider Worker login with provider selection
+- Multi-role login with role picker (Administrator, Provider, Worker, Client, Nominee)
+
+## Session 28 — 7 July 2026
+
+### Multi-Role Login, Administrator, Client Editing, Status Management
+
+- Multi-role login with role picker cards (coloured by role with descriptions)
+- Administrator role with dark sidebar, dashboard (system-wide stats), provider management (add/edit/invite)
+- `administrators` table and migration
+- Client activity editing (inline edit form for title, description, start/end time)
+- Client activity deletion for awaiting_acceptance/scheduled/rejected/cancelled activities
+- Calendar date pass-through — selected date from calendar used as default in new activity form
+- Provider Status management page — view all activities, filter by status, change status inline via dropdown
+- Status settings page under Settings showing workflow with editable labels/descriptions
+
+## Session 27 — 6 July 2026
+
+### Full Invoicing System
+
+- Invoice generation from approved activities with date range and client filter
+- Preview screen showing activities grouped by client before generating
+- `invoices` and `invoice_line_items` database tables
+- HTML invoice email with line items table sent via Brevo
+- Invoice list with Unpaid/All tabs, search, mark as paid
+- Invoice detail view with summary cards (Total, Hours, Worker Cost, Margin), line items table, Print button
+- Activities marked with `invoice_id` to prevent double-invoicing
+
+## Session 26 — 6 July 2026
+
+### RRule Recurrence Engine
+
+- RecurrencePicker component with Google Calendar-style presets (Daily, Weekly, Monthly, Custom)
+- Custom recurrence modal dialog with interval, day-of-week toggles, end condition (Never/On date/After N)
+- `rrule` library (RFC 5545) for recurrence calculation
+- Provider schedules and Client activity forms use RecurrencePicker
+- 4-week activity auto-generation from rrule patterns
+
+## Session 25 — 5 July 2026
+
+### Client Activity Request with Recurrence
+
+- Client new activity form with optional Worker and NDIS line item selection
+- One-off vs Recurring toggle with recurrence pattern (days, time, duration, date range)
+- Time entry via dropdowns (15-min increments, 12-hour format) — supports overnight shifts
+- Duration list expanded to 30min–12hr in 30-min increments
+- Separate start/end date fields for overnight shift support
+
+## Session 24 — 5 July 2026
+
+### Recurring Schedules, NDIS Percentage Rates, Optional Worker
+
+- `recurring_schedules` table with days_of_week, start_time, duration, valid_from/until
+- Provider schedules CRUD with Generate button (4-week lookahead, idempotent)
+- Simplified NDIS billing rates: `client_charge_pct` / `worker_pay_pct` on providers table
+- Per-item rate overrides on `ndis_line_items`
+- Live margin example on rates page
+- Schedules added to Provider sidebar
+- Worker field explicitly labelled optional on activity form
+
+---
+
 ## Session 23 — 5 July 2026
 
 ### Dashboard Navigation & Billing Rates Research

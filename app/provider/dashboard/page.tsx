@@ -42,7 +42,7 @@ export default function DashboardPage() {
 
     const [clientsRes, workersRes, activitiesRes, pendingRes, unassignedRes, paymentRes, clientsData, workersData] =
       await Promise.all([
-        supabase.from('clients').select('id', { count: 'exact' }).eq('active', true).eq('provider_id', providerId),
+        supabase.from('provider_clients').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('active', true),
         supabase.from('provider_carers').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('active', true),
         supabase.from('activities').select('id', { count: 'exact' }).eq('provider_id', providerId).gte('created_at', monthStart),
         supabase.from('activities').select('id', { count: 'exact' }).eq('provider_id', providerId).eq('status', 'awaiting_client_approval'),
@@ -55,7 +55,7 @@ export default function DashboardPage() {
           .eq('provider_id', providerId)
           .eq('status', 'awaiting_payment_approval')
           .order('actual_end_time'),
-        supabase.from('clients').select('id, name').eq('provider_id', providerId),
+        supabase.from('provider_clients').select('client_id, clients(id, name)').eq('provider_id', providerId).eq('active', true),
         supabase.from('provider_carers').select('carer_id, carers(id, name)')
           .eq('provider_id', providerId).eq('active', true),
       ])
@@ -68,7 +68,8 @@ export default function DashboardPage() {
     })
     setUnassigned(unassignedRes.data || [])
     setAwaitingPayment(paymentRes.data || [])
-    setClientMap(Object.fromEntries((clientsData.data || []).map((c: any) => [c.id, c.name])))
+    const cls = (clientsData.data || []).map((pc: any) => pc.clients).filter(Boolean)
+    setClientMap(Object.fromEntries(cls.map((c: any) => [c.id, c.name])))
     const wks = (workersData.data || []).map((pc: any) => pc.carers).filter(Boolean)
     setWorkerMap(Object.fromEntries(wks.map((w: any) => [w.id, w.name])))
     setWorkerList(wks)
