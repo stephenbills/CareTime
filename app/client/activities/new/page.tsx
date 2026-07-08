@@ -155,6 +155,7 @@ function ClientNewActivityInner() {
     if (!title.trim()) { setError('Activity title is required'); return }
     if (!clientId) { setError('Your profile is not set up. Contact your Provider.'); return }
     if (!startDate || !startTimeVal || !endTimeVal) { setError('Start date and shift time are required'); return }
+    if (startDate < todayStr()) { setError('Start date cannot be in the past'); return }
 
     setSaving(true)
     const durationMin = shiftDurationMinutes(startTimeVal, endTimeVal)

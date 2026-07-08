@@ -204,6 +204,12 @@ export default function ActivityPage() {
     setError('')
     const err = validate()
     if (err) { setError(err); return }
+    // A recurring schedule only generates future shifts — a one-off activity can still
+    // legitimately be logged in the past (e.g. recording a completed shift after the fact).
+    if (isNew && rruleStr && new Date(data.start_time) < new Date()) {
+      setError('Start date cannot be in the past for a recurring schedule')
+      return
+    }
     setSaving(true)
 
     const { data: { user } } = await supabase.auth.getUser()
