@@ -199,7 +199,7 @@ function ClientNewActivityInner() {
       if (created) {
         const occurrences = generateOccurrences(rruleStr!, startDate, startTimeVal, durationMin)
         if (occurrences.length > 0) {
-          await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
+          const { error: occErr } = await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
             recurring_schedule_id: created.id,
             provider_id: providerId,
             client_id: clientId,
@@ -214,6 +214,7 @@ function ClientNewActivityInner() {
             dropoff_address: dropoffAddress || null,
             venue_address: venueAddress || null,
           })))
+          if (occErr) { setError(`Schedule created, but failed to generate shifts: ${occErr.message}`); setSaving(false); return }
         }
         if (providerEmail) {
           notify('activity_changed', providerEmail, {

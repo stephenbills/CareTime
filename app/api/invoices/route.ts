@@ -12,6 +12,9 @@ export async function POST(req: NextRequest) {
   try {
     const caller = await requireProvider()
     if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!caller.providerId) {
+      return NextResponse.json({ error: 'A Provider account is required to generate invoices' }, { status: 403 })
+    }
 
     const { periodStart, periodEnd, clientId } = await req.json()
     if (!periodStart || !periodEnd) {
@@ -31,8 +34,11 @@ export async function POST(req: NextRequest) {
     const defaultWorkerPct = provider.worker_pay_pct || 62
 
     // Find billable activities: approved by client, not yet invoiced
+    // SECURITY: scoped to the caller's own provider — without this, any provider
+    // could generate (and email) invoices using another provider's activities/clients.
     let query = admin.from('activities')
       .select('*, carers(name), clients(id, name, email), ndis_line_items(line_item_number, description, unit_price, client_charge_pct_override, worker_pay_pct_override)')
+      .eq('provider_id', caller.providerId)
       .gte('start_time', new Date(periodStart).toISOString())
       .lte('start_time', new Date(periodEnd + 'T23:59:59').toISOString())
       .is('invoice_id', null)

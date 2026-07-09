@@ -119,6 +119,7 @@ export default function ClientDetails() {
         notify('details_updated', p.email, {
           recipientName: p.name,
           personName: data.name,
+          personId: clientId,
           role: 'client',
           profileUrl: `${window.location.origin}/provider/clients/${clientId}`,
         })

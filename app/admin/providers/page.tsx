@@ -10,18 +10,26 @@ export default function AdminProvidersPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.from('providers').select('*').order('name').then(({ data }) => setProviders(data || []))
+    supabase.from('providers').select('*').order('name').then(({ data, error }) => {
+      if (error) console.error('Failed to load providers:', error)
+      setProviders(data || [])
+    })
   }, [])
 
   async function sendInvite(provider: any) {
     if (!provider.email) return
     setInviting(provider.id)
-    await fetch('/api/invite', {
+    const res = await fetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: provider.email, name: provider.name, role: 'provider', recordId: provider.id }),
     })
-    const { data } = await supabase.from('providers').select('*').order('name')
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      alert(`Failed to send invite: ${body.error || res.statusText}`)
+    }
+    const { data, error } = await supabase.from('providers').select('*').order('name')
+    if (error) console.error('Failed to reload providers:', error)
     setProviders(data || [])
     setInviting(null)
   }

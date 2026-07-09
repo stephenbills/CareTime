@@ -81,7 +81,8 @@ export default function PublicHolidaysPage() {
   }
 
   async function handleDelete(id: string) {
-    await supabase.from('public_holidays').delete().eq('id', id)
+    const { error: err } = await supabase.from('public_holidays').delete().eq('id', id)
+    if (err) setError(err.message)
     setDeleteId(null)
     loadHolidays()
   }
@@ -95,7 +96,8 @@ export default function PublicHolidaysPage() {
       .filter(h => !existing.has(h.date))
       .map(h => ({ ...h, provider_id: providerId }))
     if (toInsert.length > 0) {
-      await supabase.from('public_holidays').insert(toInsert)
+      const { error: err } = await supabase.from('public_holidays').insert(toInsert)
+      if (err) setError(err.message)
     }
     setImporting(false)
     loadHolidays()

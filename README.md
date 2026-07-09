@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CareTime
 
-## Getting Started
+CareTime is a browser-based care coordination platform for NDIS support providers. It
+connects **Providers** (care agencies), **Workers** (support workers), **Clients** (people
+receiving care), and **Nominees** (client representatives) around a single shared record of
+scheduled activities — from booking a shift through acceptance, delivery, client approval,
+and NDIS-compliant invoicing.
 
-First, run the development server:
+A Client or Worker can belong to more than one Provider. Personal details (name, contact
+info, address, payment details) live in one shared record per person; everything specific to
+a particular Provider relationship — active status, notes, start/end dates — lives separately,
+so one Provider's changes never affect another Provider's relationship with the same person.
+
+## What it does
+
+- **Activity scheduling** — one-off or recurring (daily/weekly/monthly presets, or a custom
+  RFC 5545 pattern) — with a 9-status workflow from *Awaiting Acceptance* through to *Paid*
+- **Role-specific interfaces** — a desktop, sidebar-driven Provider console; mobile-first,
+  bottom-nav interfaces for Workers and Clients; a PIN-free, table-gated Administrator panel
+- **NDIS billing** — a Provider-maintained subset of the NDIS support catalogue, with
+  percentage-split pricing (client charge % / worker pay %, overridable per line item) and
+  PDF invoice generation emailed directly to Clients
+- **Email notifications** — every status change, assignment, and approval triggers an email
+  via Brevo, authorized so a notification can only be sent by someone with a real
+  relationship to what it's about
+- **Multi-provider support** — Clients and Workers can be linked to multiple Providers
+  simultaneously, each with independent active status and notes
+
+See [`docs/FUNCTIONAL_SPEC.md`](docs/FUNCTIONAL_SPEC.md) for the full feature spec and
+[`docs/DATABASE.md`](docs/DATABASE.md) for the schema reference.
+
+## Stack
+
+Next.js 16 (App Router) · TypeScript · Tailwind CSS · Supabase (Postgres + Auth) · Brevo
+(transactional email) · pdf-lib (invoices) · rrule (recurrence) · Vercel (hosting)
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+You'll need a Supabase project and the environment variables listed in
+[`docs/FUNCTIONAL_SPEC.md`](docs/FUNCTIONAL_SPEC.md#13-deployment) (`.env.local`, not
+committed). Run the SQL migrations in the order listed there — `supabase_schema.sql` first,
+then each `supabase_*_migration.sql` file — before starting the app against a fresh project.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project structure
 
-## Learn More
+- `app/` — routes, grouped by role (`provider/`, `worker/`, `client/`, `admin/`) plus shared
+  `auth/` and `api/` (server-side routes: invites, invoicing, notifications)
+- `components/` — shared UI (navigation shells, form fields, the recurrence picker, calendar
+  week view)
+- `lib/` — Supabase clients, auth helpers, email templates/sending, invoice PDF generation
+- `docs/` — functional spec and database reference (kept up to date each session)
+- `supabase_*.sql` — schema and incremental migrations, run in date order
+- `CHANGELOG.md` — session-by-session change log
 
-To learn more about Next.js, take a look at the following resources:
+## Deploying
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Connected to Vercel — pushing to `main` triggers an automatic build and deploy.

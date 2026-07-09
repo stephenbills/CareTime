@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronRight, Mail, AlertCircle, Clock } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -25,25 +26,33 @@ export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const supabase = createClient()
+  const { providerId } = useProviderId()
 
   useEffect(() => {
-    load()
-  }, [])
+    if (providerId) load()
+  }, [providerId])
 
   async function load() {
     setLoading(true)
-    const [{ data: acts }, { data: cls }, { data: wks }] = await Promise.all([
+    const [{ data: acts }, { data: clientLinks }, { data: carerLinks }] = await Promise.all([
       supabase
         .from('activities')
         .select('*')
+        .eq('provider_id', providerId)
         .eq('status', 'awaiting_client_approval')
         .order('actual_end_time', { ascending: true }),
-      supabase.from('clients').select('id, name, email'),
-      supabase.from('carers').select('id, name, email'),
+      supabase.from('provider_clients')
+        .select('client_id, clients(id, name, email)')
+        .eq('provider_id', providerId),
+      supabase.from('provider_carers')
+        .select('carer_id, carers(id, name, email)')
+        .eq('provider_id', providerId),
     ])
+    const cls = (clientLinks || []).map((l: any) => l.clients).filter(Boolean)
+    const wks = (carerLinks || []).map((l: any) => l.carers).filter(Boolean)
     setActivities(acts || [])
-    setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c])))
-    setWorkers(Object.fromEntries((wks || []).map((w: any) => [w.id, w])))
+    setClients(Object.fromEntries(cls.map((c: any) => [c.id, c])))
+    setWorkers(Object.fromEntries(wks.map((w: any) => [w.id, w])))
     setLoading(false)
   }
 

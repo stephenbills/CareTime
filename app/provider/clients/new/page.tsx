@@ -59,12 +59,13 @@ export default function NewClientPage() {
         return
       }
 
-      await supabase.from('provider_clients').insert({
+      const { error: linkErr } = await supabase.from('provider_clients').insert({
         provider_id: provider!.id,
         client_id: clientId,
         active: true,
         notes: data.comments || null,
       })
+      if (linkErr) { setError(linkErr.message); setSaving(false); return }
     } else {
       // Create new client record
       const payload = {
@@ -83,12 +84,13 @@ export default function NewClientPage() {
 
       // Create junction table entry — provider-specific notes live here, not on clients.comments
       if (provider?.id) {
-        await supabase.from('provider_clients').insert({
+        const { error: linkErr } = await supabase.from('provider_clients').insert({
           provider_id: provider.id,
           client_id: clientId,
           active: true,
           notes: data.comments || null,
         })
+        if (linkErr) { setError(linkErr.message); setSaving(false); return }
       }
 
       // Send invite for new clients only

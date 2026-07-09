@@ -17,6 +17,9 @@ export default function AdminDashboard() {
         supabase.from('carers').select('id', { count: 'exact' }),
         supabase.from('activities').select('id', { count: 'exact' }),
       ])
+      for (const [label, res] of [['providers', p], ['clients', c], ['workers', w], ['activities', a]] as const) {
+        if (res.error) console.error(`Failed to load ${label} count:`, res.error)
+      }
       setStats({
         providers: p.count ?? 0, clients: c.count ?? 0,
         workers: w.count ?? 0, activities: a.count ?? 0,

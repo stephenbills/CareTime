@@ -280,7 +280,7 @@ export default function ActivityPage() {
       if (created) {
         const occurrences = generateOccurrences(rruleStr, data.start_time, durationMin)
         if (occurrences.length > 0) {
-          await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
+          const { error: occErr } = await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
             recurring_schedule_id: created.id,
             provider_id: provider?.id || null,
             client_id: data.client_id || null,
@@ -295,6 +295,7 @@ export default function ActivityPage() {
             dropoff_address: data.dropoff_address || null,
             venue_address: data.venue_address || null,
           })))
+          if (occErr) { setError(`Schedule created, but failed to generate shifts: ${occErr.message}`); setSaving(false); return }
         }
 
         if (selectedCarer?.email) {

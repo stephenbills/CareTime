@@ -123,7 +123,12 @@ export default function SchedulesPage() {
     }
 
     if (activities.length > 0) {
-      await supabase.from('activities').insert(activities)
+      const { error: err } = await supabase.from('activities').insert(activities)
+      if (err) {
+        setGenerating(null)
+        alert(`Failed to generate activities: ${err.message}`)
+        return
+      }
     }
 
     setGenerating(null)

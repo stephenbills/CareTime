@@ -22,6 +22,34 @@ const ROLE_ROUTE: Record<string, string> = {
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'
 
+// SECURITY: verifies the calling Provider is actually linked to the record they're
+// trying to invite, before we link a new (or existing) auth account to it. Without
+// this, any Provider could pass another Provider's client/worker recordId and
+// hijack login access to that person's record. Admins may invite anyone.
+async function callerOwnsRecord(
+  admin: ReturnType<typeof createAdminClient>,
+  caller: { providerId: string | null; isAdmin: boolean },
+  role: string,
+  recordId: string
+) {
+  if (caller.isAdmin) return true
+  if (!caller.providerId) return false
+
+  if (role === 'client') {
+    const { data } = await admin.from('provider_clients')
+      .select('provider_id').eq('provider_id', caller.providerId).eq('client_id', recordId).maybeSingle()
+    return !!data
+  }
+  if (role === 'worker' || role === 'carer') {
+    const { data } = await admin.from('provider_carers')
+      .select('provider_id').eq('provider_id', caller.providerId).eq('carer_id', recordId).maybeSingle()
+    return !!data
+  }
+  // 'provider' and 'nominee' roles have no established ownership relationship
+  // to a calling Provider — only Administrators may invite those.
+  return false
+}
+
 export async function POST(req: NextRequest) {
   try {
     // SECURITY: only a logged-in Provider or Administrator may send invites.
@@ -43,6 +71,10 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient()
+
+    if (!(await callerOwnsRecord(admin, caller, role, recordId))) {
+      return NextResponse.json({ error: 'Not authorized to invite this record' }, { status: 403 })
+    }
 
     // Check if user already exists
     const { data: existingData } = await admin.auth.admin.listUsers({ perPage: 1000 })

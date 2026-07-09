@@ -57,7 +57,9 @@ export default function StatusPage() {
     const act = activities.find(a => a.id === actId)
     const { data: { user } } = await supabase.auth.getUser()
 
-    await supabase.from('activities').update({ status: newStatus }).eq('id', actId)
+    const { error: err } = await supabase.from('activities').update({ status: newStatus }).eq('id', actId)
+    if (err) { alert(`Failed to change status: ${err.message}`); setChangingId(null); return }
+
     await supabase.from('activity_status_history').insert({
       activity_id: actId,
       from_status: act?.status,

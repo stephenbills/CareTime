@@ -119,6 +119,7 @@ export default function CarerDetails() {
         notify('details_updated', p.email, {
           recipientName: p.name,
           personName: data.name,
+          personId: carerId,
           role: 'worker',
           profileUrl: `${window.location.origin}/provider/carers/${carerId}`,
         })

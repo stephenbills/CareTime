@@ -56,12 +56,13 @@ export default function NewCarerPage() {
         return
       }
 
-      await supabase.from('provider_carers').insert({
+      const { error: linkErr } = await supabase.from('provider_carers').insert({
         provider_id: providerId!,
         carer_id: workerId,
         active: true,
         notes: data.comments || null,
       })
+      if (linkErr) { setError(linkErr.message); setSaving(false); return }
     } else {
       // Create new worker record
       const payload = {
@@ -82,12 +83,13 @@ export default function NewCarerPage() {
 
       // Create junction table entry — provider-specific notes live here, not on carers.comments
       if (providerId) {
-        await supabase.from('provider_carers').insert({
+        const { error: linkErr } = await supabase.from('provider_carers').insert({
           provider_id: providerId,
           carer_id: workerId,
           active: true,
           notes: data.comments || null,
         })
+        if (linkErr) { setError(linkErr.message); setSaving(false); return }
       }
 
       // Send invite for new workers only

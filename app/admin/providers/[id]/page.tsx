@@ -23,7 +23,8 @@ export default function ProviderFormPage() {
 
   useEffect(() => {
     if (!isNew && id) {
-      supabase.from('providers').select('*').eq('id', id).single().then(({ data: p }) => {
+      supabase.from('providers').select('*').eq('id', id).single().then(({ data: p, error }) => {
+        if (error) setError(error.message)
         if (p) setData({
           name: p.name || '', email: p.email || '', phone: p.phone || '', abn: p.abn || '',
           address_line1: p.address_line1 || '', suburb: p.suburb || '',

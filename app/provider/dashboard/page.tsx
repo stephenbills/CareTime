@@ -81,8 +81,9 @@ export default function DashboardPage() {
     const act = awaitingPayment.find(a => a.id === actId)
 
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('activities')
+    const { error: err } = await supabase.from('activities')
       .update({ status: 'ready_for_payment' }).eq('id', actId)
+    if (err) { alert(`Failed to approve payment: ${err.message}`); setApprovingId(null); return }
     await supabase.from('activity_status_history').insert({
       activity_id: actId,
       from_status: 'awaiting_payment_approval',
@@ -111,8 +112,9 @@ export default function DashboardPage() {
     if (!carerId) return
     setAssigningId(actId)
 
-    await supabase.from('activities')
+    const { error: err } = await supabase.from('activities')
       .update({ carer_id: carerId, status: 'awaiting_acceptance' }).eq('id', actId)
+    if (err) { alert(`Failed to assign worker: ${err.message}`); setAssigningId(null); return }
 
     const act = unassigned.find(a => a.id === actId)
     const { data: carer } = await supabase.from('carers').select('name, email').eq('id', carerId).single()

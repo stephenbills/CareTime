@@ -41,13 +41,15 @@ export default function InvoicesPage() {
 
   async function markAsPaid(invoiceId: string) {
     setMarking(invoiceId)
-    await supabase.from('invoices')
+    const { error: err } = await supabase.from('invoices')
       .update({ status: 'paid', paid_at: new Date().toISOString() })
       .eq('id', invoiceId)
+    if (err) { alert(`Failed to mark invoice as paid: ${err.message}`); setMarking(null); return }
     // Also update linked activities
-    await supabase.from('activities')
+    const { error: actErr } = await supabase.from('activities')
       .update({ status: 'paid' })
       .eq('invoice_id', invoiceId)
+    if (actErr) console.error('Failed to update linked activities to paid:', actErr)
     await load()
     setMarking(null)
   }
