@@ -10,6 +10,7 @@ const DAYS_SHORT = ['S','M','T','W','T','F','S']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 const STATUS_DOT: Record<string, string> = {
+  awaiting_acceptance: 'bg-yellow-400',
   scheduled: 'bg-blue-500',
   in_progress: 'bg-purple-500',
   awaiting_client_approval: 'bg-orange-400',
@@ -144,7 +145,6 @@ function ClientCalendarInner() {
                 const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
                 const isSelected = day === selectedDay
                 const dayActs = actsForDay(date)
-                const needsApproval = dayActs.some(a => a.status === 'awaiting_client_approval')
                 return (
                   <div key={day} onClick={() => setSelectedDay(day)}
                     className={`h-12 flex flex-col items-center justify-start pt-1.5 cursor-pointer rounded-lg mx-0.5 ${isSelected ? 'bg-blue-50' : 'active:bg-gray-50'}`}>
@@ -152,7 +152,7 @@ function ClientCalendarInner() {
                     {dayActs.length > 0 && (
                       <div className="flex gap-0.5 mt-0.5">
                         {dayActs.slice(0, 3).map((a, idx) => (
-                          <div key={idx} className={`w-1.5 h-1.5 rounded-full ${needsApproval ? 'bg-orange-400' : STATUS_DOT[a.status] || 'bg-blue-400'}`} />
+                          <div key={idx} className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[a.status] || 'bg-blue-400'}`} />
                         ))}
                       </div>
                     )}
@@ -199,6 +199,7 @@ function ClientCalendarInner() {
           labelField="worker"
           workers={workers}
           activityLinkBase="/client/activities"
+          initialWeek={new Date(year, month, selectedDay || today.getDate())}
         />
       )}
     </div>

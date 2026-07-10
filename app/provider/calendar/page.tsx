@@ -233,7 +233,7 @@ function CalendarInner() {
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <p className="font-medium text-gray-900 text-sm leading-tight">{a.title}</p>
                         <span className={`text-xs px-1.5 py-0.5 rounded-full border whitespace-nowrap flex-shrink-0 ${STATUS_COLORS[a.status]}`}>
-                          {STATUS_LABELS[a.status]?.split(' ')[0]}
+                          {STATUS_LABELS[a.status]}
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 font-medium">{formatTime(a.start_time)} – {formatTime(a.end_time)}</p>

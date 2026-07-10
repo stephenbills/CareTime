@@ -82,9 +82,20 @@ export default function CarerDashboard() {
         supabase.from('clients').select('id, name'),
       ])
 
+      // Collapse a recurring schedule's occurrences down to a single (earliest) entry —
+      // accepting one occurrence accepts the whole series, so listing every future
+      // occurrence separately just shows the same appointment over and over.
+      const seenSchedules = new Set<string>()
+      const dedupedAwaiting = (awaiting || []).filter((a: any) => {
+        if (!a.recurring_schedule_id) return true
+        if (seenSchedules.has(a.recurring_schedule_id)) return false
+        seenSchedules.add(a.recurring_schedule_id)
+        return true
+      })
+
       setTodayActs(today || [])
       setUpcoming(upcomingScheduled || [])
-      setAwaitingList(awaiting || [])
+      setAwaitingList(dedupedAwaiting)
       setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
       setLoading(false)
     }

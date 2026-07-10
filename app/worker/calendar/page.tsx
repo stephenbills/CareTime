@@ -31,17 +31,35 @@ function WorkerCalendarInner() {
   const initialView = (searchParams?.get('view') as 'month' | 'week') || 'month'
   const [view, setView] = useState<'month' | 'week'>(initialView)
 
-  function switchView(v: 'month' | 'week') {
-    setView(v)
-    router.replace(`/worker/calendar?view=${v}`)
-  }
-  const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
+  // Restore year/month/selectedDay from the URL so navigating to an activity and
+  // back (via router.back()) lands on the same day instead of resetting to today.
+  const initialDateParam = searchParams?.get('date')
+  const initialDate = initialDateParam ? new Date(`${initialDateParam}T00:00:00`) : today
+
+  const [year, setYear] = useState(initialDate.getFullYear())
+  const [month, setMonth] = useState(initialDate.getMonth())
   const [activities, setActivities] = useState<any[]>([])
-  const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
+  const [selectedDay, setSelectedDay] = useState<number | null>(initialDate.getDate())
   const [clients, setClients] = useState<Record<string, string>>({})
   const [carerId, setCarerId] = useState<string | null>(null)
   const supabase = createClient()
+
+  function updateUrl(v: 'month' | 'week', y: number, m: number, day: number | null) {
+    const params = new URLSearchParams()
+    params.set('view', v)
+    if (day) params.set('date', `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+    router.replace(`/worker/calendar?${params.toString()}`)
+  }
+
+  function switchView(v: 'month' | 'week') {
+    setView(v)
+    updateUrl(v, year, month, selectedDay)
+  }
+
+  function selectDay(day: number) {
+    setSelectedDay(day)
+    updateUrl(view, year, month, day)
+  }
 
   useEffect(() => {
     async function init() {
@@ -72,12 +90,14 @@ function WorkerCalendarInner() {
     const nm = month === 0 ? 11 : month - 1
     const ny = month === 0 ? year - 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
+    updateUrl(view, ny, nm, null)
     if (carerId) loadMonth(carerId, ny, nm)
   }
   function nextMonth() {
     const nm = month === 11 ? 0 : month + 1
     const ny = month === 11 ? year + 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
+    updateUrl(view, ny, nm, null)
     if (carerId) loadMonth(carerId, ny, nm)
   }
 
@@ -141,7 +161,7 @@ function WorkerCalendarInner() {
                 const isSelected = day === selectedDay
                 const dayActs = actsForDay(day)
                 return (
-                  <div key={day} onClick={() => setSelectedDay(day)}
+                  <div key={day} onClick={() => selectDay(day)}
                     className={`h-12 flex flex-col items-center justify-start pt-1.5 cursor-pointer rounded-lg mx-0.5 ${
                       isSelected ? 'bg-blue-50' : 'active:bg-gray-50'
                     }`}>

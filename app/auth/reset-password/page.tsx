@@ -16,24 +16,27 @@ function ResetForm() {
   const supabase = createClient()
 
   useEffect(() => {
+    // SECURITY: only trust the PASSWORD_RECOVERY event fired when Supabase verifies
+    // the recovery link's token — do NOT fall back to whatever session already
+    // happens to exist in this browser (e.g. the Provider who sent the invite,
+    // still logged in on the same device). Trusting an existing session here would
+    // silently reset the wrong person's password.
+    let settled = false
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        if (event === 'PASSWORD_RECOVERY') {
+          settled = true
           setSessionReady(true)
-          // Show which account is being reset
-          if (session?.user?.email) {
-            setUserEmail(session.user.email)
-          }
+          if (session?.user?.email) setUserEmail(session.user.email)
         }
       }
     )
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true)
-        if (session.user?.email) setUserEmail(session.user.email)
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        setSessionError('This password reset link is invalid or has expired. Please ask for a new invitation.')
       }
-    })
-    return () => subscription.unsubscribe()
+    }, 6000)
+    return () => { subscription.unsubscribe(); clearTimeout(timeout) }
   }, [])
 
   async function handleReset(e: React.FormEvent) {

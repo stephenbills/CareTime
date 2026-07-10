@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, MapPin, Clock, CheckCircle, XCircle, Play, Square, DollarSign, MessageSquare } from 'lucide-react'
-import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
 import { RRule } from 'rrule'
 
@@ -245,9 +244,9 @@ export default function CarerActivityPage() {
     <div className="p-4 space-y-4 pb-8">
       {/* Header */}
       <div className="flex items-center gap-3 pt-1">
-        <Link href="/worker/calendar" className="p-1 text-gray-400 hover:text-gray-600">
+        <button onClick={() => router.back()} className="p-1 text-gray-400 hover:text-gray-600">
           <ArrowLeft size={20} />
-        </Link>
+        </button>
         <h1 className="text-lg font-bold text-gray-900 flex-1 leading-tight">{activity.title}</h1>
       </div>
 

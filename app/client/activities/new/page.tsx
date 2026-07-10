@@ -109,7 +109,9 @@ function ClientNewActivityInner() {
           supabase.from('ndis_line_items').select('id, line_item_number, description')
             .eq('provider_id', selectedProviderId).eq('active', true),
         ])
-        setWorkers((workerLinks || []).map((l: any) => l.carers).filter(Boolean))
+        const workerList = (workerLinks || []).map((l: any) => l.carers).filter(Boolean)
+        workerList.sort((a: any, b: any) => a.name.localeCompare(b.name))
+        setWorkers(workerList)
         setNdisItems(ndis || [])
       } else {
         // No linked Provider yet — fall back to an unscoped list rather than showing nothing
