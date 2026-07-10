@@ -25,6 +25,7 @@ export default function InvoiceDetailPage() {
   const [lineItems, setLineItems] = useState<any[]>([])
   const [clientName, setClientName] = useState('')
   const [providerName, setProviderName] = useState('')
+  const [provider, setProvider] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [marking, setMarking] = useState(false)
   const router = useRouter()
@@ -39,11 +40,14 @@ export default function InvoiceDetailPage() {
       const [{ data: items }, { data: client }, { data: prov }] = await Promise.all([
         supabase.from('invoice_line_items').select('*').eq('invoice_id', id).order('activity_date'),
         supabase.from('clients').select('name, email').eq('id', inv.client_id).single(),
-        supabase.from('providers').select('name').eq('id', inv.provider_id).single(),
+        supabase.from('providers')
+          .select('name, bank_name, bank_account_name, bank_bsb, bank_account_number, invoice_days_due')
+          .eq('id', inv.provider_id).single(),
       ])
       setLineItems(items || [])
       setClientName(client?.name || '—')
       setProviderName(prov?.name || '—')
+      setProvider(prov || null)
       setLoading(false)
     }
     load()
@@ -136,6 +140,11 @@ export default function InvoiceDetailPage() {
         {invoice.sent_at && (
           <p className="text-xs text-gray-400 mt-4">Emailed {formatDate(invoice.sent_at)}</p>
         )}
+        {invoice.sent_at && provider?.invoice_days_due != null && invoice.status !== 'paid' && (
+          <p className="text-xs text-gray-400 mt-1">
+            Payment due {formatDate(new Date(new Date(invoice.sent_at).getTime() + provider.invoice_days_due * 86400000).toISOString())}
+          </p>
+        )}
         {invoice.paid_at && (
           <p className="text-xs text-green-600 mt-1">Paid {formatDate(invoice.paid_at)}</p>
         )}
@@ -175,15 +184,55 @@ export default function InvoiceDetailPage() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-gray-50 border-t border-gray-200">
-              <td colSpan={5} className="py-3 px-4 font-bold text-gray-900">Total</td>
-              <td className="py-3 px-4 text-right font-bold text-gray-900">{invoice.total_hours}h</td>
-              <td className="py-3 px-4"></td>
-              <td className="py-3 px-4 text-right font-bold text-gray-900">${invoice.total_amount?.toFixed(2)}</td>
-            </tr>
+            {invoice.subtotal_amount != null ? (
+              <>
+                <tr className="border-t border-gray-200">
+                  <td colSpan={5} className="py-2 px-4 text-gray-500">Subtotal</td>
+                  <td className="py-2 px-4 text-right text-gray-500">{invoice.total_hours}h</td>
+                  <td className="py-2 px-4"></td>
+                  <td className="py-2 px-4 text-right text-gray-700">${invoice.subtotal_amount?.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={7} className="py-2 px-4 text-right text-gray-500">GST</td>
+                  <td className="py-2 px-4 text-right text-gray-700">${invoice.gst_amount?.toFixed(2)}</td>
+                </tr>
+                <tr className="bg-gray-50 border-t border-gray-200">
+                  <td colSpan={7} className="py-3 px-4 text-right font-bold text-gray-900">TOTAL</td>
+                  <td className="py-3 px-4 text-right font-bold text-gray-900">${invoice.total_amount?.toFixed(2)}</td>
+                </tr>
+              </>
+            ) : (
+              <tr className="bg-gray-50 border-t border-gray-200">
+                <td colSpan={5} className="py-3 px-4 font-bold text-gray-900">Total</td>
+                <td className="py-3 px-4 text-right font-bold text-gray-900">{invoice.total_hours}h</td>
+                <td className="py-3 px-4"></td>
+                <td className="py-3 px-4 text-right font-bold text-gray-900">${invoice.total_amount?.toFixed(2)}</td>
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>
+
+      {/* Payment details */}
+      {(provider?.bank_name || provider?.bank_account_name || provider?.bank_bsb || provider?.bank_account_number || provider?.invoice_days_due) && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mt-6 max-w-sm">
+          <p className="text-xs text-gray-400 font-medium uppercase mb-3">Payment Details</p>
+          <div className="space-y-1.5 text-sm">
+            {provider?.bank_name && (
+              <p className="text-gray-700"><span className="text-gray-400">Bank:</span> {provider.bank_name}</p>
+            )}
+            {provider?.bank_account_name && (
+              <p className="text-gray-700"><span className="text-gray-400">Account Name:</span> {provider.bank_account_name}</p>
+            )}
+            {provider?.bank_bsb && (
+              <p className="text-gray-700"><span className="text-gray-400">BSB:</span> {provider.bank_bsb}</p>
+            )}
+            {provider?.bank_account_number && (
+              <p className="text-gray-700"><span className="text-gray-400">Account No:</span> {provider.bank_account_number}</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

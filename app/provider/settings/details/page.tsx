@@ -9,7 +9,8 @@ const EMPTY = {
   name: '', abn: '', address_line1: '', address_line2: '', suburb: '', state: '', postcode: '',
   phone: '', fax: '', email: '', website: '', ceo_details: '', description: '',
   admin_percentage: '', admin_flat_fee: '', emergency_procedures: '',
-  bank_account_name: '', bank_bsb: '', bank_account_number: '', next_invoice_number: '1001',
+  bank_name: '', bank_account_name: '', bank_bsb: '', bank_account_number: '', next_invoice_number: '1001',
+  client_charge_pct: '100', worker_pay_pct: '62', gst_rate: '10', invoice_days_due: '14',
 }
 
 function toNum(val: string): number | null {
@@ -87,10 +88,15 @@ export default function ProviderDetailsPage() {
           admin_percentage: provider.admin_percentage != null ? String(provider.admin_percentage) : '',
           admin_flat_fee: provider.admin_flat_fee != null ? String(provider.admin_flat_fee) : '',
           emergency_procedures: provider.emergency_procedures || '',
+          bank_name: provider.bank_name || '',
           bank_account_name: provider.bank_account_name || '',
           bank_bsb: provider.bank_bsb || '',
           bank_account_number: provider.bank_account_number || '',
           next_invoice_number: provider.next_invoice_number != null ? String(provider.next_invoice_number) : '1001',
+          client_charge_pct: provider.client_charge_pct != null ? String(provider.client_charge_pct) : '100',
+          worker_pay_pct: provider.worker_pay_pct != null ? String(provider.worker_pay_pct) : '62',
+          gst_rate: provider.gst_rate != null ? String(provider.gst_rate) : '10',
+          invoice_days_due: provider.invoice_days_due != null ? String(provider.invoice_days_due) : '14',
         })
       }
       setLoading(false)
@@ -125,12 +131,17 @@ export default function ProviderDetailsPage() {
       ceo_details: data.ceo_details || null,
       description: data.description || null,
       emergency_procedures: data.emergency_procedures || null,
+      bank_name: data.bank_name || null,
       bank_account_name: data.bank_account_name || null,
       bank_bsb: data.bank_bsb || null,
       bank_account_number: data.bank_account_number || null,
       admin_percentage: toNum(data.admin_percentage),
       admin_flat_fee: toNum(data.admin_flat_fee),
       next_invoice_number: toInt(data.next_invoice_number, 1001),
+      client_charge_pct: toNum(data.client_charge_pct) ?? 100,
+      worker_pay_pct: toNum(data.worker_pay_pct) ?? 62,
+      gst_rate: toNum(data.gst_rate) ?? 10,
+      invoice_days_due: toInt(data.invoice_days_due, 14),
     }
 
     if (providerId) {
@@ -191,11 +202,31 @@ export default function ProviderDetailsPage() {
           </div>
         </Section>
 
+        <Section title="Billing Rates">
+          <p className="text-xs text-gray-400 mb-3">
+            Used to price every Activity: each NDIS line item's unit price × Client Charge % is
+            what the Client is billed; × Worker Pay % is what the Worker is paid. Either can be
+            overridden per NDIS line item in NDIS Line Items settings.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Client Charge (%)" {...f('client_charge_pct')} type="number" half placeholder="e.g. 100" />
+            <Field label="Worker Pay (%)" {...f('worker_pay_pct')} type="number" half placeholder="e.g. 62" />
+          </div>
+        </Section>
+
         <Section title="Bank Details for Invoicing">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Account Name" {...f('bank_account_name')} required />
+            <Field label="Bank Name" {...f('bank_name')} half placeholder="e.g. Commonwealth Bank" />
+            <Field label="Account Name" {...f('bank_account_name')} required half />
             <Field label="BSB" {...f('bank_bsb')} required half placeholder="e.g. 062-000" />
             <Field label="Account Number" {...f('bank_account_number')} required half />
+          </div>
+        </Section>
+
+        <Section title="Invoice Settings">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="GST Rate (%)" {...f('gst_rate')} type="number" half placeholder="e.g. 10" />
+            <Field label="Payment Due (days)" {...f('invoice_days_due')} type="number" half placeholder="e.g. 14" />
             <Field label="Next Invoice Number" {...f('next_invoice_number')} required half placeholder="e.g. 1001" />
           </div>
         </Section>

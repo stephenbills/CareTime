@@ -37,7 +37,9 @@ manages activities, invoicing, and payments through the Provider interface.
 | client_charge_pct | numeric | % of each NDIS line item's unit price charged to the Client. Default 100 |
 | worker_pay_pct | numeric | % of each NDIS line item's unit price paid to the Worker. Default 62. Overridable per line item (`ndis_line_items.worker_pay_pct_override`) |
 | emergency_procedures | text | Emergency contact procedures |
-| bank_account_name, bank_bsb, bank_account_number | text | Bank details for invoicing |
+| bank_name, bank_account_name, bank_bsb, bank_account_number | text | Bank details printed on invoices |
+| gst_rate | numeric | GST % applied to the invoice subtotal. Default 10 |
+| invoice_days_due | integer | Payment terms in days, printed on invoices as the due date. Default 14 |
 | next_invoice_number | integer | **Legacy — unused.** Invoice numbers are generated from the period date instead (see `invoices.invoice_number`) |
 | overall_client_rating | numeric | Calculated average rating from Clients |
 | overall_carer_rating | numeric | Calculated average rating from Workers |
@@ -317,7 +319,9 @@ overridden per NDIS line item — see `ndis_line_items` below).
 | invoice_number | text | Generated as `INV-{YYMMDD}-{seq}` from the period start date, not a stored running counter |
 | period_start, period_end | date | Billing period covered |
 | total_hours | numeric | Sum of billable hours across all line items |
-| total_amount | numeric | Total charged to the Client |
+| subtotal_amount | numeric | Sum of line item charges before GST (nullable — null on invoices generated before GST support was added) |
+| gst_amount | numeric | GST charged, calculated from the Provider's `gst_rate` at generation time |
+| total_amount | numeric | Total charged to the Client, **GST-inclusive** (`subtotal_amount + gst_amount`) |
 | total_worker_cost | numeric | Total paid out to Workers for this invoice (Provider-facing margin figure, not shown to the Client) |
 | status | text | `draft`, `sent`, or `paid` |
 | paid_at | timestamptz | When marked paid |

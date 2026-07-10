@@ -25,19 +25,24 @@ export async function POST(req: NextRequest) {
 
     // Get provider rates
     const { data: provider } = await admin.from('providers')
-      .select('id, name, client_charge_pct, worker_pay_pct, address_line1, suburb, state, postcode, abn')
+      .select(`
+        id, name, client_charge_pct, worker_pay_pct, address_line1, suburb, state, postcode, abn,
+        bank_name, bank_account_name, bank_bsb, bank_account_number, gst_rate, invoice_days_due
+      `)
       .eq('id', caller.providerId).single()
 
     if (!provider) return NextResponse.json({ error: 'Provider not found' }, { status: 404 })
 
     const defaultClientPct = provider.client_charge_pct || 100
     const defaultWorkerPct = provider.worker_pay_pct || 62
+    const gstRate = provider.gst_rate ?? 10
+    const daysDue = provider.invoice_days_due ?? 14
 
     // Find billable activities: approved by client, not yet invoiced
     // SECURITY: scoped to the caller's own provider — without this, any provider
     // could generate (and email) invoices using another provider's activities/clients.
     let query = admin.from('activities')
-      .select('*, carers(name), clients(id, name, email), ndis_line_items(line_item_number, description, unit_price, client_charge_pct_override, worker_pay_pct_override)')
+      .select('*, carers(name), clients(id, name, email, address_line1, address_line2, suburb, state, postcode), ndis_line_items(line_item_number, description, unit_price, client_charge_pct_override, worker_pay_pct_override)')
       .eq('provider_id', caller.providerId)
       .gte('start_time', new Date(periodStart).toISOString())
       .lte('start_time', new Date(periodEnd + 'T23:59:59').toISOString())
@@ -139,7 +144,13 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      console.log(`[/api/invoices] Client ${cid}: ${acts.length} activities, ${Math.round(totalHours*100)/100}h, $${Math.round(totalAmount*100)/100} charge, $${Math.round(totalWorkerCost*100)/100} worker cost`)
+      const subtotalAmount = Math.round(totalAmount * 100) / 100
+      const gstAmount = Math.round(subtotalAmount * (gstRate / 100) * 100) / 100
+      const grandTotal = Math.round((subtotalAmount + gstAmount) * 100) / 100
+
+      console.log(`[/api/invoices] Client ${cid}: ${acts.length} activities, ${Math.round(totalHours*100)/100}h, subtotal $${subtotalAmount}, GST $${gstAmount}, total $${grandTotal}, worker cost $${Math.round(totalWorkerCost*100)/100}`)
+
+      const sentDate = new Date().toISOString()
 
       // Create invoice
       const { data: invoice, error: invErr } = await admin.from('invoices').insert({
@@ -149,10 +160,12 @@ export async function POST(req: NextRequest) {
         period_start: periodStart,
         period_end: periodEnd,
         total_hours: Math.round(totalHours * 100) / 100,
-        total_amount: Math.round(totalAmount * 100) / 100,
+        subtotal_amount: subtotalAmount,
+        gst_amount: gstAmount,
+        total_amount: grandTotal,
         total_worker_cost: Math.round(totalWorkerCost * 100) / 100,
         status: 'sent',
-        sent_at: new Date().toISOString(),
+        sent_at: sentDate,
       }).select().single()
 
       if (invErr) {
@@ -173,6 +186,9 @@ export async function POST(req: NextRequest) {
 
       // Email invoice to client with PDF attachment
       if (client?.email) {
+        const dueDate = new Date(sentDate)
+        dueDate.setDate(dueDate.getDate() + daysDue)
+
         // Generate PDF
         let pdfBase64 = ''
         try {
@@ -182,13 +198,23 @@ export async function POST(req: NextRequest) {
             providerAddress: [provider.address_line1, provider.suburb, provider.state, provider.postcode].filter(Boolean).join(', ') || undefined,
             providerAbn: provider.abn || undefined,
             clientName: client.name,
+            clientAddress: [client.address_line1, client.address_line2, client.suburb, client.state, client.postcode].filter(Boolean).join(', ') || undefined,
+            clientEmail: client.email || undefined,
             periodStart,
             periodEnd,
             lineItems,
             totalHours: Math.round(totalHours * 100) / 100,
-            totalAmount: Math.round(totalAmount * 100) / 100,
+            subtotalAmount,
+            gstRate,
+            gstAmount,
+            totalAmount: grandTotal,
             totalWorkerCost: Math.round(totalWorkerCost * 100) / 100,
-            sentDate: new Date().toISOString(),
+            sentDate,
+            dueDate: dueDate.toISOString(),
+            bankName: provider.bank_name || undefined,
+            bankAccountName: provider.bank_account_name || undefined,
+            bankBsb: provider.bank_bsb || undefined,
+            bankAccountNumber: provider.bank_account_number || undefined,
           })
           // Convert Uint8Array to base64
           const binaryStr = Array.from(pdfBytes).map(b => String.fromCharCode(b)).join('')
@@ -206,7 +232,10 @@ export async function POST(req: NextRequest) {
           periodEnd,
           lineItems,
           totalHours: Math.round(totalHours * 100) / 100,
-          totalAmount: Math.round(totalAmount * 100) / 100,
+          subtotalAmount,
+          gstAmount,
+          totalAmount: grandTotal,
+          dueDate: dueDate.toISOString(),
           invoiceUrl: `${APP_URL}/client/dashboard`,
         })
         try {
@@ -248,7 +277,8 @@ function formatTime(iso: string) {
 function buildInvoiceEmail(opts: {
   clientName: string; providerName: string; invoiceNumber: string
   periodStart: string; periodEnd: string; lineItems: any[]
-  totalHours: number; totalAmount: number; invoiceUrl: string
+  totalHours: number; subtotalAmount: number; gstAmount: number; totalAmount: number
+  dueDate: string; invoiceUrl: string
 }) {
   const rows = opts.lineItems.map(li => `
     <tr>
@@ -270,7 +300,7 @@ function buildInvoiceEmail(opts: {
   <tr><td style="padding:28px;">
     <h1 style="margin:0 0 4px;font-size:20px;color:#111827;">Invoice ${opts.invoiceNumber}</h1>
     <p style="margin:0 0 20px;font-size:13px;color:#6b7280;">
-      From ${opts.providerName} · Period: ${formatDate(opts.periodStart)} – ${formatDate(opts.periodEnd)}
+      From ${opts.providerName} · Period: ${formatDate(opts.periodStart)} – ${formatDate(opts.periodEnd)} · Due ${formatDate(opts.dueDate)}
     </p>
     <p style="margin:0 0 16px;font-size:14px;color:#374151;">Hi ${opts.clientName},</p>
     <p style="margin:0 0 20px;font-size:14px;color:#374151;">Please find your invoice details below.</p>
@@ -283,6 +313,16 @@ function buildInvoiceEmail(opts: {
         <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Amount</th>
       </tr>
       ${rows}
+      <tr>
+        <td colspan="3" style="padding:8px 12px;font-size:13px;color:#6b7280;"></td>
+        <td colspan="1" style="padding:8px 12px;font-size:13px;color:#6b7280;text-align:right;">Subtotal</td>
+        <td style="padding:8px 12px;font-size:13px;color:#374151;text-align:right;">$${opts.subtotalAmount.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td colspan="3" style="padding:0 12px;font-size:13px;color:#6b7280;"></td>
+        <td colspan="1" style="padding:0 12px 8px;font-size:13px;color:#6b7280;text-align:right;">GST</td>
+        <td style="padding:0 12px 8px;font-size:13px;color:#374151;text-align:right;">$${opts.gstAmount.toFixed(2)}</td>
+      </tr>
       <tr style="background:#f9fafb;">
         <td colspan="3" style="padding:12px;font-size:14px;font-weight:700;color:#111827;">Total</td>
         <td style="padding:12px;text-align:right;font-size:14px;font-weight:700;color:#111827;">${opts.totalHours}h</td>

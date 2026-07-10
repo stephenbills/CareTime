@@ -4,6 +4,35 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 37 — 10 July 2026
+
+### Fix Persistent Mobile Zoom, Redesign Invoices (GST, Payment Details, Fixed Layout Bugs)
+
+- Fixed the mobile sizing regression that survived Session 36's viewport fix: iOS Safari
+  auto-zooms in on any input/select/textarea under 16px on focus, and the zoom can persist
+  across client-side route changes (e.g. logging in) — many fields in this app use Tailwind's
+  `text-sm` (14px). Added a global rule forcing 16px on form controls on small screens
+  instead of hunting down every individual input.
+- Redesigned the invoice PDF (`lib/invoice/pdf.ts`):
+  - Smaller margins (50pt → 36pt)
+  - Client address (if on file) shown under the Client's name, with email below that
+  - Line items restructured to two lines each: Date/Start/End/Worker/Hours/Rate/Cost on the
+    first line, NDIS item code + description indented under Worker on the second
+  - Fixed the "amount unreadable" bug — the Hours and Amount columns' pixel ranges literally
+    overlapped in the old layout; rebuilt all column positions to be strictly non-overlapping
+    and verified by rendering a real PDF with sample data, not just by inspecting the code
+  - Added a Subtotal / GST / Total breakdown and a Payment Details block (Bank Name, Account
+    Name, BSB, Account Number) at the bottom, plus the payment due date
+  - Mirrored the Subtotal/GST/Total breakdown and a Payment Details card onto the on-screen
+    invoice detail page for consistency with the emailed PDF
+- Schema: added `providers.bank_name`, `providers.gst_rate` (default 10%), and
+  `providers.invoice_days_due` (default 14) — new `supabase_invoice_settings_migration.sql`,
+  plus `invoices.subtotal_amount`/`gst_amount` to store the breakdown alongside the existing
+  GST-inclusive `total_amount`
+- Provider Settings → Details: added Bank Name, GST Rate, and Payment Due (days) fields, and
+  a new "Billing Rates" section exposing Client Charge % / Worker Pay % — these were already
+  driving every invoice calculation but had no UI to edit them at all before now
+
 ## Session 36 — 10 July 2026
 
 ### Fix Mobile Viewport Not Scaling to Device Width
