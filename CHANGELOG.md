@@ -4,6 +4,17 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 36 — 10 July 2026
+
+### Fix Mobile Viewport Not Scaling to Device Width
+
+The root layout had no `viewport` export, so mobile browsers (Worker and Client roles) were
+rendering the page at a default desktop-width viewport and scaling it down to fit the physical
+screen, rather than laying out at the phone's actual width. Added an explicit
+`width: 'device-width', initialScale: 1` viewport export to `app/layout.tsx` and verified via
+the dev server that `<meta name="viewport" content="width=device-width, initial-scale=1">` is
+now actually present in the rendered `<head>`.
+
 ## Session 35 — 10 July 2026
 
 ### Fix Password-Reset Links Failing Immediately (Real Root Cause)
