@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
 import RecurrencePicker from '@/components/RecurrencePicker'
+import SearchableSelect from '@/components/SearchableSelect'
 import { RRule } from 'rrule'
 import { Suspense } from 'react'
 
@@ -261,7 +262,7 @@ function ClientNewActivityInner() {
     }
 
     setSaving(false)
-    router.push('/client/calendar')
+    router.push(`/client/calendar?date=${startDate}`)
   }
 
   return (
@@ -331,13 +332,17 @@ function ClientNewActivityInner() {
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
               NDIS Support Type <span className="text-gray-300">(optional)</span>
             </label>
-            <select value={ndisItemId} onChange={e => setNdisItemId(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="">— Select support type —</option>
-              {ndisItems.map(n => (
-                <option key={n.id} value={n.id}>{n.line_item_number} — {n.description}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={ndisItemId}
+              onChange={setNdisItemId}
+              placeholder="— Select support type —"
+              emptyText="No matching support types"
+              options={ndisItems.map(n => ({
+                value: n.id,
+                label: `${n.line_item_number} — ${n.description}`,
+                searchText: `${n.line_item_number} ${n.description}`,
+              }))}
+            />
             {ndisItems.length === 0 && (
               <p className="text-xs text-gray-300 mt-1">No NDIS items configured by your Provider yet</p>
             )}

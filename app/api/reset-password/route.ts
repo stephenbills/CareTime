@@ -92,7 +92,13 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`
 
-    await sendEmail({ to: email, subject: 'Reset your CareTime password', html })
+    // Same timeout guard as generateLink above — without it, a slow/unreachable
+    // Brevo API leaves this request (and the client's fetch) hanging indefinitely.
+    const sendPromise = sendEmail({ to: email, subject: 'Reset your CareTime password', html })
+    const sendTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out after 8 seconds')), 8000)
+    )
+    await Promise.race([sendPromise, sendTimeout])
     console.log('[/api/reset-password] Reset email sent via Brevo to', email)
     return NextResponse.json({ success: true })
 

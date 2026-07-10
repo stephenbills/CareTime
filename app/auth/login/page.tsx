@@ -106,15 +106,26 @@ export default function LoginPage() {
     if (!email.trim()) { setError('Please enter your email address first'); return }
     setResetLoading(true)
     setError('')
-    const res = await fetch('/api/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    })
-    const result = await res.json()
-    if (!res.ok) { setError(result.error || 'Failed to send reset email. Please try again.') }
-    else { setResetSent(true) }
-    setResetLoading(false)
+    // The server has its own timeout, but guard here too so the button can never
+    // hang forever if the response never comes back (e.g. a dropped connection).
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12000)
+    try {
+      const res = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+        signal: controller.signal,
+      })
+      const result = await res.json()
+      if (!res.ok) { setError(result.error || 'Failed to send reset email. Please try again.') }
+      else { setResetSent(true) }
+    } catch (err: any) {
+      setError(err?.name === 'AbortError' ? 'Request timed out — please try again' : 'Failed to send reset email. Please try again.')
+    } finally {
+      clearTimeout(timeout)
+      setResetLoading(false)
+    }
   }
 
   // Provider picker for multi-provider workers

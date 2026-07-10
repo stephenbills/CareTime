@@ -42,17 +42,36 @@ function ClientCalendarInner() {
   const initialView = (searchParams?.get('view') as 'month' | 'week') || 'month'
   const [view, setView] = useState<'month' | 'week'>(initialView)
 
-  function switchView(v: 'month' | 'week') {
-    setView(v)
-    router.replace(`/client/calendar?view=${v}`)
-  }
-  const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
+  // Restore year/month/selectedDay from the URL so returning here (e.g. after
+  // creating an activity, or navigating to one and back) lands on the same day
+  // instead of resetting to today.
+  const initialDateParam = searchParams?.get('date')
+  const initialDate = initialDateParam ? new Date(`${initialDateParam}T00:00:00`) : today
+
+  const [year, setYear] = useState(initialDate.getFullYear())
+  const [month, setMonth] = useState(initialDate.getMonth())
   const [activities, setActivities] = useState<any[]>([])
-  const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
+  const [selectedDay, setSelectedDay] = useState<number | null>(initialDate.getDate())
   const [workers, setWorkers] = useState<Record<string, string>>({})
   const [clientIds, setClientIds] = useState<string[]>([])
   const supabase = createClient()
+
+  function updateUrl(v: 'month' | 'week', y: number, m: number, day: number | null) {
+    const params = new URLSearchParams()
+    params.set('view', v)
+    if (day) params.set('date', `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+    router.replace(`/client/calendar?${params.toString()}`)
+  }
+
+  function switchView(v: 'month' | 'week') {
+    setView(v)
+    updateUrl(v, year, month, selectedDay)
+  }
+
+  function selectDay(day: number) {
+    setSelectedDay(day)
+    updateUrl(view, year, month, day)
+  }
 
   useEffect(() => {
     async function init() {
@@ -84,12 +103,14 @@ function ClientCalendarInner() {
     const nm = month === 0 ? 11 : month - 1
     const ny = month === 0 ? year - 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
+    updateUrl(view, ny, nm, null)
     if (clientIds.length) loadActivities(clientIds, ny, nm)
   }
   function nextMonth() {
     const nm = month === 11 ? 0 : month + 1
     const ny = month === 11 ? year + 1 : year
     setYear(ny); setMonth(nm); setSelectedDay(null)
+    updateUrl(view, ny, nm, null)
     if (clientIds.length) loadActivities(clientIds, ny, nm)
   }
 
@@ -146,7 +167,7 @@ function ClientCalendarInner() {
                 const isSelected = day === selectedDay
                 const dayActs = actsForDay(date)
                 return (
-                  <div key={day} onClick={() => setSelectedDay(day)}
+                  <div key={day} onClick={() => selectDay(day)}
                     className={`h-12 flex flex-col items-center justify-start pt-1.5 cursor-pointer rounded-lg mx-0.5 ${isSelected ? 'bg-blue-50' : 'active:bg-gray-50'}`}>
                     <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium ${isToday ? 'bg-blue-600 text-white' : isSelected ? 'text-blue-600' : 'text-gray-700'}`}>{day}</span>
                     {dayActs.length > 0 && (

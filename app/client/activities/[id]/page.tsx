@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Clock, MapPin, Star } from 'lucide-react'
 import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
+import RecurrencePicker from '@/components/RecurrencePicker'
+import { RRule } from 'rrule'
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-AU', {
@@ -30,6 +32,19 @@ function toLocalDateTimeInput(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function localDateStr(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+}
+
+// Minutes from start to end, rolling over to the next day if end <= start
+function shiftDurationMinutes(startTimeStr: string, endTimeStr: string) {
+  const [sh, sm] = startTimeStr.split(':').map(Number)
+  const [eh, em] = endTimeStr.split(':').map(Number)
+  const diff = (eh * 60 + em) - (sh * 60 + sm)
+  return diff <= 0 ? diff + 24 * 60 : diff
+}
+
 export default function ClientActivityPage() {
   const [activity, setActivity] = useState<any>(null)
   const [worker, setWorker] = useState<any>(null)
@@ -45,6 +60,10 @@ export default function ClientActivityPage() {
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editData, setEditData] = useState({ title: '', description: '', start_time: '', end_time: '' })
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
+  const [editRrule, setEditRrule] = useState<string | null>(null)
+  const [schedule, setSchedule] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const params = useParams()
@@ -70,6 +89,15 @@ export default function ClientActivityPage() {
     }
     setWorker(wk)
     setProvider(prov)
+
+    if (act.recurring_schedule_id) {
+      const { data: sched } = await supabase
+        .from('recurring_schedules').select('*').eq('id', act.recurring_schedule_id).maybeSingle()
+      setSchedule(sched || null)
+    } else {
+      setSchedule(null)
+    }
+
     setLoading(false)
   }
 
@@ -174,18 +202,119 @@ export default function ClientActivityPage() {
       start_time: toLocalDateTimeInput(activity.start_time),
       end_time: toLocalDateTimeInput(activity.end_time),
     })
+    if (schedule) {
+      setEditStartTime((schedule.start_time || '09:00').slice(0, 5))
+      const [sh, sm] = (schedule.start_time || '09:00').slice(0, 5).split(':').map(Number)
+      const endMins = sh * 60 + sm + (schedule.duration_minutes || 120)
+      const eh = Math.floor((endMins % 1440) / 60)
+      const em = endMins % 60
+      setEditEndTime(`${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`)
+      setEditRrule(schedule.rrule || null)
+    }
   }
 
   async function handleSaveEdit() {
     if (!editData.title.trim()) { setError('Title is required'); return }
     setActing(true); setError('')
-    const { error: err } = await supabase.from('activities').update({
-      title: editData.title.trim(),
-      description: editData.description || null,
-      start_time: editData.start_time ? new Date(editData.start_time).toISOString() : undefined,
-      end_time: editData.end_time ? new Date(editData.end_time).toISOString() : undefined,
-    }).eq('id', id)
-    if (err) { setError(err.message); setActing(false); return }
+
+    if (activity.recurring_schedule_id && schedule) {
+      // Recurring activity — cascade title/description/time-of-day changes to
+      // every not-yet-completed occurrence in the series (each keeps its own
+      // date), and allow editing the recurrence pattern itself.
+      const durationMin = shiftDurationMinutes(editStartTime, editEndTime)
+      const rruleChanged = editRrule !== schedule.rrule
+
+      let daysOfWeek: number[] | null = null
+      if (editRrule) {
+        try {
+          const rule = RRule.fromString(editRrule)
+          const byDay = rule.origOptions.byweekday
+          if (byDay) {
+            daysOfWeek = (byDay as any[]).map((d: any) => {
+              const wd = typeof d === 'number' ? d : (d.weekday ?? d)
+              return (wd + 1) % 7
+            })
+          }
+        } catch {}
+      }
+
+      const { error: schedErr } = await supabase.from('recurring_schedules').update({
+        title: editData.title.trim(),
+        description: editData.description || null,
+        rrule: editRrule,
+        days_of_week: daysOfWeek,
+        start_time: editStartTime,
+        duration_minutes: durationMin,
+      }).eq('id', activity.recurring_schedule_id)
+      if (schedErr) { setError(schedErr.message); setActing(false); return }
+
+      const { data: siblings, error: fetchErr } = await supabase
+        .from('activities').select('id, start_time')
+        .eq('recurring_schedule_id', activity.recurring_schedule_id)
+        .in('status', ['awaiting_acceptance', 'scheduled'])
+      if (fetchErr) { setError(fetchErr.message); setActing(false); return }
+
+      const [sh, sm] = editStartTime.split(':').map(Number)
+      const existingDates = new Set<string>()
+      for (const sib of siblings || []) {
+        const d = new Date(sib.start_time)
+        existingDates.add(localDateStr(d))
+        const start = new Date(d); start.setHours(sh, sm, 0, 0)
+        const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
+        const { error: patchErr } = await supabase.from('activities').update({
+          title: editData.title.trim(),
+          description: editData.description || null,
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+        }).eq('id', sib.id)
+        if (patchErr) { setError(patchErr.message); setActing(false); return }
+      }
+
+      // If the pattern changed, add any newly-implied future occurrences that
+      // don't already exist — existing occurrences are never deleted here, so
+      // switching patterns only adds shifts, it never silently removes
+      // confirmed ones (use the existing delete flow for that).
+      if (rruleChanged && editRrule) {
+        const rule = RRule.fromString(editRrule)
+        const now = new Date(); now.setHours(0, 0, 0, 0)
+        const until = new Date(now); until.setDate(until.getDate() + 28)
+        const occurrences = rule.between(now, until, true)
+        const newRows = occurrences
+          .filter(occ => !existingDates.has(localDateStr(occ)))
+          .map(occ => {
+            const start = new Date(occ); start.setHours(sh, sm, 0, 0)
+            const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
+            return {
+              recurring_schedule_id: activity.recurring_schedule_id,
+              provider_id: schedule.provider_id,
+              client_id: schedule.client_id,
+              carer_id: schedule.carer_id || null,
+              ndis_line_item_id: schedule.ndis_line_item_id || null,
+              title: editData.title.trim(),
+              description: editData.description || null,
+              status: 'awaiting_acceptance',
+              start_time: start.toISOString(),
+              end_time: end.toISOString(),
+              pickup_address: schedule.pickup_address || null,
+              dropoff_address: schedule.dropoff_address || null,
+              venue_address: schedule.venue_address || null,
+            }
+          })
+        if (newRows.length > 0) {
+          const { error: insErr } = await supabase.from('activities').insert(newRows)
+          if (insErr) { setError(insErr.message); setActing(false); return }
+        }
+      }
+    } else {
+      const { error: err } = await supabase.from('activities').update({
+        title: editData.title.trim(),
+        description: editData.description || null,
+        start_time: editData.start_time ? new Date(editData.start_time).toISOString() : undefined,
+        end_time: editData.end_time ? new Date(editData.end_time).toISOString() : undefined,
+      }).eq('id', id)
+      if (err) { setError(err.message); setActing(false); return }
+    }
+
     setEditing(false)
     await load()
     setActing(false)
@@ -310,20 +439,50 @@ export default function ClientActivityPage() {
               rows={2}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Start</label>
-              <input type="datetime-local" value={editData.start_time}
-                onChange={e => setEditData(prev => ({ ...prev, start_time: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          {activity.recurring_schedule_id ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Time</label>
+                  <input type="time" value={editStartTime}
+                    onChange={e => setEditStartTime(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">End Time</label>
+                  <input type="time" value={editEndTime}
+                    onChange={e => setEditEndTime(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">
+                Title, description, and time changes apply to every upcoming occurrence of this appointment.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Recurrence</label>
+                <RecurrencePicker
+                  startDate={new Date(activity.start_time)}
+                  initialRRule={editRrule}
+                  onChange={str => setEditRrule(str)}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Start</label>
+                <input type="datetime-local" value={editData.start_time}
+                  onChange={e => setEditData(prev => ({ ...prev, start_time: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">End</label>
+                <input type="datetime-local" value={editData.end_time}
+                  onChange={e => setEditData(prev => ({ ...prev, end_time: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">End</label>
-              <input type="datetime-local" value={editData.end_time}
-                onChange={e => setEditData(prev => ({ ...prev, end_time: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-          </div>
+          )}
           {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-3 py-2">⚠ {error}</div>}
           <div className="flex gap-2">
             <button onClick={handleSaveEdit} disabled={acting}
@@ -460,6 +619,10 @@ export default function ClientActivityPage() {
             </span>
           )}
         </div>
+
+        {schedule?.rrule && (() => {
+          try { return <p className="text-xs text-blue-600">{RRule.fromString(schedule.rrule).toText()}</p> } catch { return null }
+        })()}
 
         <div className="flex items-start gap-2 text-sm text-gray-600">
           <Clock size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />

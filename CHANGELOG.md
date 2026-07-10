@@ -4,6 +4,29 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 34 — 10 July 2026
+
+### Recurring Activity Editing, Password-Reset Hang Fix, Calendar/UX Polish
+
+- Client activity edit form: editing a recurring occurrence now cascades title/description/
+  time-of-day changes to every not-yet-completed occurrence in the series (each keeps its own
+  date), and adds a Recurrence editor (reusing `RecurrencePicker`) — changing the pattern adds
+  any newly-implied future occurrences without deleting existing ones
+- Fixed `/auth/reset-password`: the recovery flow trusted any pre-existing browser session via
+  `getSession()` before the link's token was verified, so clicking a password-setup link while
+  still logged in as another account showed (and would have reset) the wrong account. Now only
+  trusts the `PASSWORD_RECOVERY` event, with a clear error if it never fires
+- Fixed `/api/reset-password` and the login page's "Forgot password" flow hanging indefinitely
+  if the Brevo API was slow/unreachable — added a server-side timeout around the email send and
+  a client-side abort timeout
+- Client "Add Activity": Worker dropdown sorted alphabetically; NDIS Support Type is now a
+  searchable dropdown (new `components/SearchableSelect.tsx`) instead of a plain `<select>`,
+  since a Provider's NDIS catalogue can be long
+- Client header: Client's name now shown on the right with "CareTime" on the left, matching
+  the Worker header layout
+- Client calendar: selected day now persists through the URL, so returning from creating an
+  activity (or navigating to one and back) lands on the same day instead of resetting to today
+
 ## Session 33 — 8 July 2026
 
 ### Recurring Provider Activities, Multi-Provider Client Requests, Notify-on-Details-Save
