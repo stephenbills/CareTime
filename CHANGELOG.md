@@ -4,6 +4,23 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 35 — 10 July 2026
+
+### Fix Password-Reset Links Failing Immediately (Real Root Cause)
+
+Session 34's reset-password fix correctly stopped trusting a stale pre-existing browser
+session — but that removed the only thing that had ever produced *any* session on that page,
+surfacing a deeper, pre-existing bug: `createBrowserClient` (`@supabase/ssr`) uses the PKCE
+flow, so the recovery link redirects to `/auth/reset-password` with `?code=...` in the URL
+rather than tokens in the hash fragment. That code was never being exchanged for a session —
+so every link, valid or not, ended at "This password reset link is invalid or has expired,"
+often within minutes of being sent despite the 24-hour expiry claimed in the email.
+
+Fixed by explicitly calling `supabase.auth.exchangeCodeForSession(code)` when a `code` param
+is present, alongside the existing `PASSWORD_RECOVERY` event listener (kept as a fallback path).
+Verified `exchangeCodeForSession`'s signature and return shape directly against the installed
+`@supabase/auth-js` type definitions before relying on it.
+
 ## Session 34 — 10 July 2026
 
 ### Recurring Activity Editing, Password-Reset Hang Fix, Calendar/UX Polish

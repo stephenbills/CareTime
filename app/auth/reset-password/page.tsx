@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 function ResetForm() {
   const [password, setPassword] = useState('')
@@ -13,15 +13,18 @@ function ResetForm() {
   const [sessionError, setSessionError] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+  const exchangeStarted = useRef(false)
 
   useEffect(() => {
-    // SECURITY: only trust the PASSWORD_RECOVERY event fired when Supabase verifies
-    // the recovery link's token — do NOT fall back to whatever session already
-    // happens to exist in this browser (e.g. the Provider who sent the invite,
-    // still logged in on the same device). Trusting an existing session here would
-    // silently reset the wrong person's password.
+    // SECURITY: only trust a session established from this specific link — do NOT
+    // fall back to whatever session already happens to exist in this browser (e.g.
+    // the Provider who sent the invite, still logged in on the same device).
+    // Trusting an existing session here would silently reset the wrong person's
+    // password.
     let settled = false
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
@@ -31,11 +34,33 @@ function ResetForm() {
         }
       }
     )
+
+    // createBrowserClient (@supabase/ssr) uses the PKCE flow, so the recovery link
+    // redirects here with ?code=... rather than tokens in the URL hash — unlike the
+    // implicit flow, this is NOT exchanged for a session automatically and must be
+    // done explicitly, otherwise no session (and no PASSWORD_RECOVERY event) is ever
+    // produced — which is why every link, valid or not, was ending up at the
+    // "invalid or expired" error.
+    const code = searchParams?.get('code')
+    if (code && !exchangeStarted.current) {
+      exchangeStarted.current = true
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error: exchErr }) => {
+        if (settled) return
+        if (exchErr) {
+          setSessionError('This password reset link is invalid or has expired. Please ask for a new invitation.')
+          return
+        }
+        settled = true
+        setSessionReady(true)
+        if (data.session?.user?.email) setUserEmail(data.session.user.email)
+      })
+    }
+
     const timeout = setTimeout(() => {
       if (!settled) {
         setSessionError('This password reset link is invalid or has expired. Please ask for a new invitation.')
       }
-    }, 6000)
+    }, 8000)
     return () => { subscription.unsubscribe(); clearTimeout(timeout) }
   }, [])
 
