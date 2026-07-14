@@ -71,6 +71,8 @@ function ClientNewActivityInner() {
   const [selectedProviderId, setSelectedProviderId] = useState<string>('')
   const [workers, setWorkers] = useState<any[]>([])
   const [ndisItems, setNdisItems] = useState<any[]>([])
+  const [medicalInstructions, setMedicalInstructions] = useState<any[]>([])
+  const [selectedInstructionIds, setSelectedInstructionIds] = useState<Set<string>>(new Set())
 
   const router = useRouter()
   const supabase = createClient()
@@ -95,9 +97,23 @@ function ClientNewActivityInner() {
       const provs = (links || []).map((l: any) => l.providers).filter(Boolean)
       setProviders(provs)
       if (provs.length > 0) setSelectedProviderId(provs[0].id)
+
+      const { data: instructions } = await supabase
+        .from('medical_instructions').select('id, title, instructions')
+        .eq('client_id', client.id).eq('active', true)
+        .order('title')
+      setMedicalInstructions(instructions || [])
     }
     load()
   }, [])
+
+  function toggleInstruction(id: string) {
+    setSelectedInstructionIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
 
   // Scope Preferred Worker + NDIS Support Type to the selected Provider
   useEffect(() => {
@@ -202,7 +218,7 @@ function ClientNewActivityInner() {
       if (created) {
         const occurrences = generateOccurrences(rruleStr!, startDate, startTimeVal, durationMin)
         if (occurrences.length > 0) {
-          const { error: occErr } = await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
+          const { data: createdActivities, error: occErr } = await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
             recurring_schedule_id: created.id,
             provider_id: providerId,
             client_id: clientId,
@@ -216,8 +232,15 @@ function ClientNewActivityInner() {
             pickup_address: pickupAddress || null,
             dropoff_address: dropoffAddress || null,
             venue_address: venueAddress || null,
-          })))
+          }))).select('id')
           if (occErr) { setError(`Schedule created, but failed to generate shifts: ${occErr.message}`); setSaving(false); return }
+
+          if (selectedInstructionIds.size > 0 && createdActivities) {
+            const rows = createdActivities.flatMap(a => Array.from(selectedInstructionIds).map(instructionId => ({
+              activity_id: a.id, medical_instruction_id: instructionId,
+            })))
+            await supabase.from('activity_medical_instructions').insert(rows)
+          }
         }
         if (providerEmail) {
           notify('activity_changed', providerEmail, {
@@ -249,6 +272,14 @@ function ClientNewActivityInner() {
       }).select().single()
 
       if (err) { setError(err.message); setSaving(false); return }
+
+      if (created && selectedInstructionIds.size > 0) {
+        await supabase.from('activity_medical_instructions').insert(
+          Array.from(selectedInstructionIds).map(instructionId => ({
+            activity_id: created.id, medical_instruction_id: instructionId,
+          }))
+        )
+      }
 
       if (created && providerEmail) {
         notify('activity_changed', providerEmail, {
@@ -348,6 +379,22 @@ function ClientNewActivityInner() {
             )}
           </div>
         </div>
+
+        {/* Medical Instructions — only shown if the Client has any defined */}
+        {medicalInstructions.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+            <h2 className="font-semibold text-gray-900 text-sm">Medical Instructions</h2>
+            <p className="text-xs text-gray-400 -mt-2">Attach any that apply to this Activity</p>
+            {medicalInstructions.map(mi => (
+              <label key={mi.id} className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={selectedInstructionIds.has(mi.id)}
+                  onChange={() => toggleInstruction(mi.id)}
+                  className="w-4 h-4 mt-0.5 accent-blue-600 rounded flex-shrink-0" />
+                <span className="text-sm text-gray-700">{mi.title}</span>
+              </label>
+            ))}
+          </div>
+        )}
 
         {/* Shift Time */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">

@@ -61,6 +61,8 @@ export default function CarerActivityPage() {
   const [actualStart, setActualStart] = useState('')
   const [actualEnd, setActualEnd] = useState('')
   const [showSubmitForm, setShowSubmitForm] = useState(false)
+  const [medInstructions, setMedInstructions] = useState<any[]>([])
+  const [counters, setCounters] = useState<any[]>([])
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
@@ -91,10 +93,44 @@ export default function CarerActivityPage() {
       setRecurrenceText(null)
     }
 
+    await loadExtras(act.client_id)
     setLoading(false)
   }
 
+  async function loadExtras(clientId: string | null) {
+    const [{ data: attached }, { data: allCounters }, { data: values }] = await Promise.all([
+      supabase.from('activity_medical_instructions')
+        .select('id, medical_instruction_id, completed, completed_at, medical_instructions(title, instructions)')
+        .eq('activity_id', id),
+      clientId
+        ? supabase.from('client_counters').select('id, title').eq('client_id', clientId).eq('active', true).order('title')
+        : Promise.resolve({ data: [] }),
+      supabase.from('activity_counter_values').select('counter_id, value').eq('activity_id', id),
+    ])
+    setMedInstructions(attached || [])
+    const valueMap = new Map((values || []).map((v: any) => [v.counter_id, v.value]))
+    setCounters((allCounters || []).map((c: any) => ({ ...c, value: valueMap.get(c.id) ?? 0 })))
+  }
+
   useEffect(() => { load() }, [id])
+
+  async function handleToggleInstruction(rowId: string, currentlyCompleted: boolean) {
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('activity_medical_instructions').update(
+      currentlyCompleted
+        ? { completed: false, completed_at: null, completed_by: null }
+        : { completed: true, completed_at: new Date().toISOString(), completed_by: user!.id }
+    ).eq('id', rowId)
+    await loadExtras(activity.client_id)
+  }
+
+  async function handleCounterChange(counterId: string, delta: number) {
+    const current = counters.find(c => c.id === counterId)?.value ?? 0
+    const next = Math.max(0, current + delta)
+    await supabase.from('activity_counter_values')
+      .upsert({ activity_id: id, counter_id: counterId, value: next, updated_at: new Date().toISOString() }, { onConflict: 'activity_id,counter_id' })
+    await loadExtras(activity.client_id)
+  }
 
   async function updateStatus(newStatus: string, extraFields: Record<string, any> = {}) {
     setActing(true)
@@ -465,6 +501,51 @@ export default function CarerActivityPage() {
               </div>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Medical Instructions */}
+      {medInstructions.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          <h2 className="font-semibold text-gray-900 text-sm">Medical Instructions</h2>
+          {medInstructions.map((mi: any) => (
+            <label key={mi.id}
+              className={`flex items-start gap-3 p-3 rounded-xl ${mi.completed ? 'bg-green-50' : 'bg-gray-50'} ${status === 'in_progress' ? 'cursor-pointer' : ''}`}>
+              <input type="checkbox" checked={mi.completed}
+                disabled={status !== 'in_progress'}
+                onChange={() => handleToggleInstruction(mi.id, mi.completed)}
+                className="w-5 h-5 mt-0.5 accent-green-600 rounded flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">{mi.medical_instructions?.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{mi.medical_instructions?.instructions}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {/* Counters */}
+      {counters.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          <h2 className="font-semibold text-gray-900 text-sm">Counters</h2>
+          {counters.map((c: any) => (
+            <div key={c.id} className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">{c.title}</span>
+              <div className="flex items-center gap-3">
+                <button onClick={() => handleCounterChange(c.id, -1)}
+                  disabled={status !== 'in_progress'}
+                  className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-bold disabled:opacity-40 active:bg-gray-200 transition-colors">
+                  −
+                </button>
+                <span className="w-6 text-center text-sm font-semibold text-gray-900">{c.value}</span>
+                <button onClick={() => handleCounterChange(c.id, 1)}
+                  disabled={status !== 'in_progress'}
+                  className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-bold disabled:opacity-40 active:bg-gray-200 transition-colors">
+                  +
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

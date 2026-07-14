@@ -4,6 +4,28 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 38 — 14 July 2026
+
+### Medical Instructions & Counters
+
+- New Client-managed lists: Medical Instructions (title + free-text "what to give") and Counters
+  (title only, ≤30 chars, unique per Client) — `app/client/medical-instructions/page.tsx` and
+  `app/client/counters/page.tsx`, linked from `/client/details`
+- Client "Add"/"Edit Activity" gained a checkbox picker to attach none/one/many Medical
+  Instructions to an Activity; for a new recurring Activity this attaches to every occurrence
+  generated at creation time, but editing an existing occurrence's attachments only affects that
+  one Activity — it does not cascade to the rest of the series like title/description edits do
+- Worker's shift screen (`app/worker/activities/[id]/page.tsx`) now shows attached Medical
+  Instructions as a checklist (tick to mark given, timestamped) and every one of the Client's
+  Counters as a +/- stepper, both interactive only while the shift is `in_progress`; nothing
+  blocks submitting the shift if items are left unchecked
+- Counters are a per-shift tally (reset to 0 each Activity, not a running total) — the Client's
+  Activity detail page shows a read-only summary of given/not-given instructions and each
+  counter's value for that specific shift
+- Schema: new `supabase_medical_instructions_counters_migration.sql` — `medical_instructions`,
+  `activity_medical_instructions`, `client_counters`, `activity_counter_values`, RLS following
+  the existing coarse "any authenticated user" policy style
+
 ## Session 37 — 10 July 2026
 
 ### Fix Persistent Mobile Zoom, Redesign Invoices (GST, Payment Details, Fixed Layout Bugs)

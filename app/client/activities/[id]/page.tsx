@@ -66,6 +66,10 @@ export default function ClientActivityPage() {
   const [schedule, setSchedule] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [medicalInstructions, setMedicalInstructions] = useState<any[]>([])
+  const [attachedInstructions, setAttachedInstructions] = useState<any[]>([])
+  const [selectedInstructionIds, setSelectedInstructionIds] = useState<Set<string>>(new Set())
+  const [counterValues, setCounterValues] = useState<any[]>([])
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
@@ -98,10 +102,35 @@ export default function ClientActivityPage() {
       setSchedule(null)
     }
 
+    if (act.client_id) {
+      const [{ data: allInstructions }, { data: attached }, { data: allCounters }, { data: values }] = await Promise.all([
+        supabase.from('medical_instructions').select('id, title, instructions')
+          .eq('client_id', act.client_id).eq('active', true).order('title'),
+        supabase.from('activity_medical_instructions')
+          .select('id, medical_instruction_id, completed, completed_at, medical_instructions(title, instructions)')
+          .eq('activity_id', id),
+        supabase.from('client_counters').select('id, title')
+          .eq('client_id', act.client_id).eq('active', true).order('title'),
+        supabase.from('activity_counter_values').select('counter_id, value').eq('activity_id', id),
+      ])
+      setMedicalInstructions(allInstructions || [])
+      setAttachedInstructions(attached || [])
+      const valueMap = new Map((values || []).map((v: any) => [v.counter_id, v.value]))
+      setCounterValues((allCounters || []).map((c: any) => ({ ...c, value: valueMap.get(c.id) ?? 0 })))
+    }
+
     setLoading(false)
   }
 
   useEffect(() => { load() }, [id])
+
+  function toggleInstruction(instructionId: string) {
+    setSelectedInstructionIds(prev => {
+      const next = new Set(prev)
+      if (next.has(instructionId)) next.delete(instructionId); else next.add(instructionId)
+      return next
+    })
+  }
 
   async function handleApprove() {
     if (rating === 0) { setError('Please give a rating before approving'); return }
@@ -202,6 +231,7 @@ export default function ClientActivityPage() {
       start_time: toLocalDateTimeInput(activity.start_time),
       end_time: toLocalDateTimeInput(activity.end_time),
     })
+    setSelectedInstructionIds(new Set(attachedInstructions.map(a => a.medical_instruction_id)))
     if (schedule) {
       setEditStartTime((schedule.start_time || '09:00').slice(0, 5))
       const [sh, sm] = (schedule.start_time || '09:00').slice(0, 5).split(':').map(Number)
@@ -313,6 +343,15 @@ export default function ClientActivityPage() {
         end_time: editData.end_time ? new Date(editData.end_time).toISOString() : undefined,
       }).eq('id', id)
       if (err) { setError(err.message); setActing(false); return }
+    }
+
+    // Medical Instructions are per-occurrence only — never cascaded to siblings,
+    // unlike title/description/time-of-day above.
+    await supabase.from('activity_medical_instructions').delete().eq('activity_id', id)
+    if (selectedInstructionIds.size > 0) {
+      await supabase.from('activity_medical_instructions').insert(
+        Array.from(selectedInstructionIds).map(medical_instruction_id => ({ activity_id: id, medical_instruction_id }))
+      )
     }
 
     setEditing(false)
@@ -481,6 +520,20 @@ export default function ClientActivityPage() {
                   onChange={e => setEditData(prev => ({ ...prev, end_time: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+            </div>
+          )}
+          {medicalInstructions.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-gray-50">
+              <p className="text-xs font-medium text-gray-500">Medical Instructions</p>
+              {medicalInstructions.map(mi => (
+                <label key={mi.id} className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={selectedInstructionIds.has(mi.id)}
+                    onChange={() => toggleInstruction(mi.id)}
+                    className="w-4 h-4 mt-0.5 accent-blue-600 rounded flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{mi.title}</span>
+                </label>
+              ))}
+              <p className="text-xs text-gray-400">Applies to this occurrence only, not the whole series.</p>
             </div>
           )}
           {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-3 py-2">⚠ {error}</div>}
@@ -681,6 +734,43 @@ export default function ClientActivityPage() {
           </div>
         )}
       </div>
+
+      {/* Medical Instructions & Counters results — read-only, filled in by the Worker during the shift */}
+      {!editing && (attachedInstructions.length > 0 || counterValues.length > 0) && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+          {attachedInstructions.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="font-semibold text-gray-900 text-sm">Medical Instructions</h2>
+              {attachedInstructions.map((a: any) => (
+                <div key={a.id} className="flex items-start gap-2 text-sm">
+                  <span className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded flex items-center justify-center text-[10px] ${
+                    a.completed ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-300'
+                  }`}>{a.completed ? '✓' : ''}</span>
+                  <div>
+                    <p className="text-gray-900">{a.medical_instructions?.title}</p>
+                    <p className="text-xs text-gray-400">
+                      {a.completed ? `Given${a.completed_at ? ' · ' + formatDateTime(a.completed_at) : ''}` : 'Not yet given'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {counterValues.length > 0 && (
+            <div className={`space-y-2 ${attachedInstructions.length > 0 ? 'pt-3 border-t border-gray-50' : ''}`}>
+              <h2 className="font-semibold text-gray-900 text-sm">Counters</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {counterValues.map((c: any) => (
+                  <div key={c.id} className="bg-gray-50 rounded-xl px-3 py-2">
+                    <p className="text-xs text-gray-500">{c.title}</p>
+                    <p className="text-lg font-bold text-gray-900">{c.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Locations */}
       {(activity.pickup_address || activity.dropoff_address) && (
