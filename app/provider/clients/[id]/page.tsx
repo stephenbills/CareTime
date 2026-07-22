@@ -21,6 +21,8 @@ export default function ClientDetailPage() {
   const [inviting, setInviting] = useState(false)
   const [inviteMsg, setInviteMsg] = useState('')
   const [nominees, setNominees] = useState<any[]>([])
+  const [medicalInstructions, setMedicalInstructions] = useState<any[]>([])
+  const [counters, setCounters] = useState<any[]>([])
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -52,6 +54,16 @@ export default function ClientDetailPage() {
         .select('nominees(id, name, email)')
         .eq('client_id', id)
       setNominees(noms?.map((n: any) => n.nominees).filter(Boolean) ?? [])
+
+      const [{ data: mi }, { data: ctrs }] = await Promise.all([
+        supabase.from('medical_instructions').select('id, title, instructions')
+          .eq('client_id', id).eq('active', true).order('title'),
+        supabase.from('client_counters').select('id, title')
+          .eq('client_id', id).eq('active', true).order('title'),
+      ])
+      setMedicalInstructions(mi || [])
+      setCounters(ctrs || [])
+
       setLoading(false)
     }
     load()
@@ -166,6 +178,33 @@ export default function ClientDetailPage() {
                     <p className="text-sm font-medium text-gray-900">{n.name}</p>
                     <p className="text-xs text-gray-400">{n.email}</p>
                   </div>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {medicalInstructions.length > 0 && (
+          <Section title="Medical Instructions">
+            <p className="text-xs text-gray-400 -mt-2 mb-3">Managed by the client — attached to Activities for Workers to action</p>
+            <ul className="divide-y divide-gray-50">
+              {medicalInstructions.map((mi: any) => (
+                <li key={mi.id} className="py-2.5">
+                  <p className="text-sm font-medium text-gray-900">{mi.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{mi.instructions}</p>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {counters.length > 0 && (
+          <Section title="Counters">
+            <p className="text-xs text-gray-400 -mt-2 mb-3">Managed by the client — tallied by Workers on every shift</p>
+            <ul className="divide-y divide-gray-50">
+              {counters.map((c: any) => (
+                <li key={c.id} className="py-2.5">
+                  <p className="text-sm font-medium text-gray-900">{c.title}</p>
                 </li>
               ))}
             </ul>

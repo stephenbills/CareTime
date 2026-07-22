@@ -4,6 +4,22 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 39 — 22 July 2026
+
+### Worker Field Parity, Provider Visibility, and a Compliance Report
+
+- `/worker/details`: Workers can now self-edit Work Phone, Car Registration, and ABN — closes
+  the Session 32 gap where these fields fell through the cracks of the Provider/Client-editable
+  split and weren't editable by anyone
+- Provider's Client detail page (`app/provider/clients/[id]/page.tsx`) gained read-only
+  "Medical Instructions" and "Counters" sections showing what the Client has defined for
+  themselves (each only renders if the Client has any) — Providers previously had no visibility
+  into either
+- `/provider/reports` now has a real second report: "Medical Instructions & Counters", lazy-loaded
+  on first click, reusing the existing client/date-range filters (keyed on `actual_start_time`).
+  Shows a per-Client breakdown of each instruction's given/total count with a percentage, and
+  each counter's summed total over the selected range
+
 ## Session 38 — 14 July 2026
 
 ### Medical Instructions & Counters

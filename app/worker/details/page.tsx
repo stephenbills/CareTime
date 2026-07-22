@@ -20,9 +20,9 @@ function Field({ label, value, onChange, type = 'text', required = false }: {
 }
 
 const EMPTY = {
-  name: '', email: '', mobile: '', home_phone: '',
+  name: '', email: '', mobile: '', home_phone: '', work_phone: '', car_registration: '',
   address_line1: '', suburb: '', state: '', postcode: '',
-  bank_bsb: '', bank_account_number: '',
+  bank_bsb: '', bank_account_number: '', abn: '',
 }
 
 type Provider = { id: string; name: string; email: string | null }
@@ -103,12 +103,15 @@ export default function CarerDetails() {
       email: data.email || null,
       mobile: data.mobile || null,
       home_phone: data.home_phone || null,
+      work_phone: data.work_phone || null,
+      car_registration: data.car_registration || null,
       address_line1: data.address_line1 || null,
       suburb: data.suburb || null,
       state: data.state || null,
       postcode: data.postcode || null,
       bank_bsb: data.bank_bsb || null,
       bank_account_number: data.bank_account_number || null,
+      abn: data.abn || null,
     }
 
     const { error: err } = await supabase.from('carers').update(payload).eq('id', carerId!)
@@ -157,6 +160,8 @@ export default function CarerDetails() {
           <Field label="Email Address" value={data.email} onChange={v => set('email', v)} type="email" required />
           <Field label="Mobile Phone" value={data.mobile} onChange={v => set('mobile', v)} required />
           <Field label="Home Phone" value={data.home_phone} onChange={v => set('home_phone', v)} />
+          <Field label="Work Phone" value={data.work_phone} onChange={v => set('work_phone', v)} />
+          <Field label="Car Registration" value={data.car_registration} onChange={v => set('car_registration', v)} />
         </div>
 
         {/* Address */}
@@ -177,6 +182,7 @@ export default function CarerDetails() {
             <Field label="BSB" value={data.bank_bsb} onChange={v => set('bank_bsb', v)} />
             <Field label="Account Number" value={data.bank_account_number} onChange={v => set('bank_account_number', v)} />
           </div>
+          <Field label="ABN" value={data.abn} onChange={v => set('abn', v)} />
         </div>
 
         {error && (
