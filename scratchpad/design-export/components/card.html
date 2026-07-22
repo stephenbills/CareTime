@@ -1,0 +1,65 @@
+<!-- @dsCard group="Components" name="Cards" subtitle="Base surface card and the stat-card variant" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CareTime — Cards</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 p-10">
+  <div class="max-w-3xl mx-auto space-y-8">
+    <header>
+      <h1 class="text-2xl font-bold text-gray-900">Cards</h1>
+      <p class="text-sm text-gray-500 mt-1">Every white panel in the app is built from this base pattern.</p>
+    </header>
+
+    <section>
+      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Base card</h2>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 max-w-sm">
+        <h3 class="font-semibold text-gray-900 mb-2">Card Title</h3>
+        <p class="text-sm text-gray-500">Body content goes here — used for lists, panels, and detail sections.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Stat card (dashboard top row)</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-blue-200 hover:shadow-md transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-gray-500">Active Clients</span>
+            <div class="bg-blue-500 w-9 h-9 rounded-lg flex items-center justify-center">
+              <i data-lucide="users" class="w-4 h-4 text-white"></i>
+            </div>
+          </div>
+          <p class="text-3xl font-bold text-gray-900">24</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-blue-200 hover:shadow-md transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-gray-500">Active Workers</span>
+            <div class="bg-green-500 w-9 h-9 rounded-lg flex items-center justify-center">
+              <i data-lucide="user-check" class="w-4 h-4 text-white"></i>
+            </div>
+          </div>
+          <p class="text-3xl font-bold text-gray-900">11</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Alert / banner card</h2>
+      <div class="max-w-lg bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <i data-lucide="user-x" class="w-[18px] h-[18px] text-amber-600 flex-shrink-0"></i>
+          <div>
+            <p class="text-sm font-semibold text-amber-900">3 activities with no Worker assigned</p>
+            <p class="text-xs text-amber-600 mt-0.5">Assign a Worker below</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

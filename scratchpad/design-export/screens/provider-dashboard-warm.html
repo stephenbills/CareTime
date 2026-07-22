@@ -1,0 +1,160 @@
+<!-- @dsCard group="Screens" name="Provider Dashboard — Warm Palette" subtitle="Same layout and data as baseline, terracotta/amber palette instead of blue/cool-gray" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CareTime — Dashboard (Warm)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-stone-50">
+  <div class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-56 bg-stone-900 min-h-screen flex flex-col flex-shrink-0">
+      <div class="px-4 py-5 border-b border-stone-700">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
+            <span class="text-white text-sm font-bold">C</span>
+          </div>
+          <span class="text-white font-semibold text-sm">CareTime</span>
+        </div>
+      </div>
+      <nav class="flex-1 px-2 py-4 space-y-0.5">
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm bg-amber-600 text-white"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>Dashboard</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="users" class="w-4 h-4"></i>Clients</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="user-check" class="w-4 h-4"></i>Workers</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="calendar" class="w-4 h-4"></i>Calendar</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="refresh-cw" class="w-4 h-4"></i>Schedules</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="clipboard-list" class="w-4 h-4"></i>Status</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="file-text" class="w-4 h-4"></i>Invoices</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="bar-chart-2" class="w-4 h-4"></i>Reports</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="settings" class="w-4 h-4"></i>Settings</a>
+      </nav>
+      <div class="px-2 py-4 border-t border-stone-700">
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-400"><i data-lucide="log-out" class="w-4 h-4"></i>Logout</a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 p-8">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-stone-900">Dashboard</h1>
+        <p class="text-stone-500 text-sm mt-1">Welcome back</p>
+      </div>
+
+      <!-- Alert banners -->
+      <div class="space-y-3 mb-6">
+        <div class="bg-orange-50 border border-orange-200 rounded-xl px-5 py-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <i data-lucide="user-x" class="w-[18px] h-[18px] text-orange-600 flex-shrink-0"></i>
+            <div>
+              <p class="text-sm font-semibold text-orange-900">3 activities with no Worker assigned</p>
+              <p class="text-xs text-orange-600 mt-0.5">Assign a Worker below</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <i data-lucide="check-circle" class="w-[18px] h-[18px] text-rose-600 flex-shrink-0"></i>
+            <div>
+              <p class="text-sm font-semibold text-rose-900">2 shifts awaiting your payment approval</p>
+              <p class="text-xs text-rose-600 mt-0.5">Approve below to mark ready for payment</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:border-amber-200 hover:shadow-md transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-stone-500">Active Clients</span>
+            <div class="bg-amber-500 w-9 h-9 rounded-lg flex items-center justify-center"><i data-lucide="users" class="w-4 h-4 text-white"></i></div>
+          </div>
+          <p class="text-3xl font-bold text-stone-900">24</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:border-amber-200 hover:shadow-md transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-stone-500">Active Workers</span>
+            <div class="bg-orange-500 w-9 h-9 rounded-lg flex items-center justify-center"><i data-lucide="user-check" class="w-4 h-4 text-white"></i></div>
+          </div>
+          <p class="text-3xl font-bold text-stone-900">11</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:border-amber-200 hover:shadow-md transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-stone-500">Activities This Month</span>
+            <div class="bg-red-400 w-9 h-9 rounded-lg flex items-center justify-center"><i data-lucide="activity" class="w-4 h-4 text-white"></i></div>
+          </div>
+          <p class="text-3xl font-bold text-stone-900">142</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-100 p-5 hover:border-amber-200 hover:shadow-md transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-stone-500">Awaiting Client Approval</span>
+            <div class="bg-yellow-500 w-9 h-9 rounded-lg flex items-center justify-center"><i data-lucide="clock" class="w-4 h-4 text-white"></i></div>
+          </div>
+          <p class="text-3xl font-bold text-stone-900">5</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Unassigned -->
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
+          <h2 class="font-semibold text-stone-900 mb-4">Unassigned Activities</h2>
+          <div class="space-y-2">
+            <div class="p-3 rounded-lg border border-orange-100 bg-orange-50">
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-stone-900">Morning Support</p>
+                  <p class="text-xs text-stone-500 mt-0.5">Jane Smith · 14 Jul, 9:00 AM</p>
+                </div>
+              </div>
+              <select class="w-full border border-orange-200 bg-white rounded-lg px-2 py-1.5 text-xs">
+                <option>Select a Worker to assign…</option>
+              </select>
+            </div>
+            <div class="p-3 rounded-lg border border-orange-100 bg-orange-50">
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-stone-900">Community Access</p>
+                  <p class="text-xs text-stone-500 mt-0.5">Tom Lee · 15 Jul, 1:00 PM</p>
+                </div>
+              </div>
+              <select class="w-full border border-orange-200 bg-white rounded-lg px-2 py-1.5 text-xs">
+                <option>Select a Worker to assign…</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Awaiting payment -->
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
+          <h2 class="font-semibold text-stone-900 mb-4">Awaiting Payment Approval</h2>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between p-3 rounded-lg border border-rose-100 bg-rose-50">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-stone-900">Evening Support</p>
+                <p class="text-xs text-stone-500 mt-0.5">Maria Garcia · Alex Chen</p>
+              </div>
+              <button class="ml-3 flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0">
+                <i data-lucide="check-circle" class="w-3 h-3"></i>Approve
+              </button>
+            </div>
+            <div class="flex items-center justify-between p-3 rounded-lg border border-rose-100 bg-rose-50">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-stone-900">Overnight Support</p>
+                <p class="text-xs text-stone-500 mt-0.5">David Kim · Priya Patel</p>
+              </div>
+              <button class="ml-3 flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0">
+                <i data-lucide="check-circle" class="w-3 h-3"></i>Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

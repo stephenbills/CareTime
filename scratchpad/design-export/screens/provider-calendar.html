@@ -1,0 +1,134 @@
+<!-- @dsCard group="Screens" name="Provider — Calendar" subtitle="Sidebar + WeekView 24-hour grid with status-colored activity blocks" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CareTime — Provider Calendar</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  .hour-row { height: 48px; }
+</style>
+</head>
+<body class="bg-gray-50">
+  <div class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-56 bg-gray-900 min-h-screen flex flex-col flex-shrink-0">
+      <div class="px-4 py-5 border-b border-gray-700">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+            <span class="text-white text-sm font-bold">C</span>
+          </div>
+          <span class="text-white font-semibold text-sm">CareTime</span>
+        </div>
+      </div>
+      <nav class="flex-1 px-2 py-4 space-y-0.5">
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>Dashboard</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="users" class="w-4 h-4"></i>Clients</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="user-check" class="w-4 h-4"></i>Workers</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm bg-blue-600 text-white"><i data-lucide="calendar" class="w-4 h-4"></i>Calendar</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="refresh-cw" class="w-4 h-4"></i>Schedules</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="clipboard-list" class="w-4 h-4"></i>Status</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="file-text" class="w-4 h-4"></i>Invoices</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="bar-chart-2" class="w-4 h-4"></i>Reports</a>
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="settings" class="w-4 h-4"></i>Settings</a>
+      </nav>
+      <div class="px-2 py-4 border-t border-gray-700">
+        <a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400"><i data-lucide="log-out" class="w-4 h-4"></i>Logout</a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 p-8">
+      <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Calendar</h1>
+        <p class="text-gray-500 text-sm mt-1">Week view across all Clients and Workers</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <button class="p-1.5 rounded-lg hover:bg-gray-50"><i data-lucide="chevron-left" class="w-[18px] h-[18px] text-gray-500"></i></button>
+          <span class="font-semibold text-gray-900 text-xs">14–20 July 2026</span>
+          <button class="p-1.5 rounded-lg hover:bg-gray-50"><i data-lucide="chevron-right" class="w-[18px] h-[18px] text-gray-500"></i></button>
+        </div>
+
+        <!-- Day headers -->
+        <div class="grid border-b border-gray-100" style="grid-template-columns: 40px repeat(7, 1fr);">
+          <div></div>
+          <div class="py-2 text-center"><p class="text-xs text-gray-400">Sun</p><p class="text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto text-gray-700">12</p></div>
+          <div class="py-2 text-center"><p class="text-xs text-gray-400">Mon</p><p class="text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto text-gray-700">13</p></div>
+          <div class="py-2 text-center"><p class="text-xs text-gray-400">Tue</p><p class="text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto bg-blue-600 text-white">14</p></div>
+          <div class="py-2 text-center"><p class="text-xs text-gray-400">Wed</p><p class="text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto text-gray-700">15</p></div>
+          <div class="py-2 text-center"><p class="text-xs text-gray-400">Thu</p><p class="text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto text-gray-700">16</p></div>
+          <div class="py-2 text-center"><p class="text-xs text-gray-400">Fri</p><p class="text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto text-gray-700">17</p></div>
+          <div class="py-2 text-center"><p class="text-xs text-gray-400">Sat</p><p class="text-sm font-semibold mt-0.5 w-7 h-7 rounded-full flex items-center justify-center mx-auto text-gray-700">18</p></div>
+        </div>
+
+        <!-- Time grid (6am–10pm shown, real component scrolls a full 24h) -->
+        <div class="relative" style="display: grid; grid-template-columns: 40px repeat(7, 1fr);">
+          <div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">6am</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">7am</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">8am</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-100"><span class="text-xs text-gray-300">9am</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">10am</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">11am</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-100"><span class="text-xs text-gray-300">12pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">1pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">2pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">3pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">4pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">5pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-100"><span class="text-xs text-gray-300">6pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">7pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">8pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">9pm</span></div>
+            <div class="hour-row flex items-start justify-end pr-2 pt-1 border-b border-gray-50"><span class="text-xs text-gray-300">10pm</span></div>
+          </div>
+
+          <!-- Sun -->
+          <div class="relative border-l border-gray-50" style="height: 816px;"></div>
+          <!-- Mon -->
+          <div class="relative border-l border-gray-50" style="height: 816px;">
+            <a class="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-xs font-medium leading-tight bg-blue-500 text-white" style="top: 144px; height: 96px;">
+              <span class="block truncate">Jane · Alex</span>
+            </a>
+          </div>
+          <!-- Tue (today) -->
+          <div class="relative border-l border-gray-50 bg-blue-50/20" style="height: 816px;">
+            <a class="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-xs font-medium leading-tight bg-yellow-400 text-yellow-900" style="top: 96px; height: 72px;">
+              <span class="block truncate">Tom · Unassigned</span>
+            </a>
+            <a class="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-xs font-medium leading-tight bg-purple-500 text-white" style="top: 288px; height: 96px;">
+              <span class="block truncate">Maria · Priya</span>
+            </a>
+          </div>
+          <!-- Wed -->
+          <div class="relative border-l border-gray-50" style="height: 816px;">
+            <a class="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-xs font-medium leading-tight bg-green-500 text-white" style="top: 480px; height: 72px;">
+              <span class="block truncate">David · Priya</span>
+            </a>
+          </div>
+          <!-- Thu -->
+          <div class="relative border-l border-gray-50" style="height: 816px;">
+            <a class="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-xs font-medium leading-tight bg-orange-400 text-white" style="top: 192px; height: 96px;">
+              <span class="block truncate">Jane · Alex</span>
+            </a>
+          </div>
+          <!-- Fri -->
+          <div class="relative border-l border-gray-50" style="height: 816px;">
+            <a class="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-xs font-medium leading-tight bg-indigo-400 text-white" style="top: 336px; height: 96px;">
+              <span class="block truncate">Tom · Alex</span>
+            </a>
+          </div>
+          <!-- Sat -->
+          <div class="relative border-l border-gray-50" style="height: 816px;"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

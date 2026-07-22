@@ -1,0 +1,150 @@
+<!-- @dsCard group="Screens" name="Provider Dashboard — Data-Dense" subtitle="Same data as baseline, packed tighter: compact stat strip + tabular lists instead of cards" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CareTime — Dashboard (Data-Dense)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50">
+  <div class="flex min-h-screen">
+
+    <!-- Sidebar (narrower, tighter) -->
+    <aside class="w-48 bg-gray-900 min-h-screen flex flex-col flex-shrink-0">
+      <div class="px-3 py-4 border-b border-gray-700">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+            <span class="text-white text-xs font-bold">C</span>
+          </div>
+          <span class="text-white font-semibold text-xs">CareTime</span>
+        </div>
+      </div>
+      <nav class="flex-1 px-1.5 py-3 space-y-0.5">
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs bg-blue-600 text-white"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>Dashboard</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="users" class="w-3.5 h-3.5"></i>Clients</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="user-check" class="w-3.5 h-3.5"></i>Workers</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="calendar" class="w-3.5 h-3.5"></i>Calendar</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Schedules</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>Status</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>Invoices</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>Reports</a>
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="settings" class="w-3.5 h-3.5"></i>Settings</a>
+      </nav>
+      <div class="px-1.5 py-3 border-t border-gray-700">
+        <a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-gray-400"><i data-lucide="log-out" class="w-3.5 h-3.5"></i>Logout</a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h1 class="text-lg font-bold text-gray-900">Dashboard</h1>
+          <p class="text-gray-500 text-xs">Welcome back</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+          <i data-lucide="clock" class="w-3.5 h-3.5"></i> Updated just now
+        </div>
+      </div>
+
+      <!-- Alert strip (inline, single row, not boxed banners) -->
+      <div class="flex flex-wrap gap-2 mb-4 text-xs">
+        <span class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 rounded-md font-medium">
+          <i data-lucide="user-x" class="w-3 h-3"></i> 3 unassigned
+        </span>
+        <span class="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-800 px-2.5 py-1 rounded-md font-medium">
+          <i data-lucide="check-circle" class="w-3 h-3"></i> 2 awaiting payment approval
+        </span>
+      </div>
+
+      <!-- Compact stat strip: 6 tiles instead of 4 cards -->
+      <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-5">
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+          <p class="text-[11px] text-gray-500 leading-tight">Active Clients</p>
+          <p class="text-xl font-bold text-gray-900 tabular-nums">24</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+          <p class="text-[11px] text-gray-500 leading-tight">Active Workers</p>
+          <p class="text-xl font-bold text-gray-900 tabular-nums">11</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+          <p class="text-[11px] text-gray-500 leading-tight">Activities / mo</p>
+          <p class="text-xl font-bold text-gray-900 tabular-nums">142</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+          <p class="text-[11px] text-gray-500 leading-tight">Awaiting Approval</p>
+          <p class="text-xl font-bold text-gray-900 tabular-nums">5</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+          <p class="text-[11px] text-gray-500 leading-tight">Hours / week</p>
+          <p class="text-xl font-bold text-gray-900 tabular-nums">386</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+          <p class="text-[11px] text-gray-500 leading-tight">Revenue / mo (est)</p>
+          <p class="text-xl font-bold text-gray-900 tabular-nums">$18.2k</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Unassigned — table -->
+        <div class="bg-white rounded-lg border border-gray-100 overflow-hidden">
+          <h2 class="text-xs font-semibold text-gray-900 px-3 py-2 border-b border-gray-100 bg-gray-50">Unassigned Activities</h2>
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-gray-400 text-left">
+                <th class="font-medium px-3 py-1.5">Activity</th>
+                <th class="font-medium px-3 py-1.5">Client</th>
+                <th class="font-medium px-3 py-1.5">Time</th>
+                <th class="font-medium px-3 py-1.5">Assign</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              <tr class="bg-amber-50/50">
+                <td class="px-3 py-1.5 font-medium text-gray-900">Morning Support</td>
+                <td class="px-3 py-1.5 text-gray-500">Jane Smith</td>
+                <td class="px-3 py-1.5 text-gray-500 tabular-nums">14 Jul, 9:00a</td>
+                <td class="px-3 py-1.5"><select class="border border-amber-200 rounded px-1 py-0.5 text-[11px]"><option>Select…</option></select></td>
+              </tr>
+              <tr>
+                <td class="px-3 py-1.5 font-medium text-gray-900">Community Access</td>
+                <td class="px-3 py-1.5 text-gray-500">Tom Lee</td>
+                <td class="px-3 py-1.5 text-gray-500 tabular-nums">15 Jul, 1:00p</td>
+                <td class="px-3 py-1.5"><select class="border border-amber-200 rounded px-1 py-0.5 text-[11px]"><option>Select…</option></select></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Awaiting payment — table -->
+        <div class="bg-white rounded-lg border border-gray-100 overflow-hidden">
+          <h2 class="text-xs font-semibold text-gray-900 px-3 py-2 border-b border-gray-100 bg-gray-50">Awaiting Payment Approval</h2>
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-gray-400 text-left">
+                <th class="font-medium px-3 py-1.5">Activity</th>
+                <th class="font-medium px-3 py-1.5">Client / Worker</th>
+                <th class="font-medium px-3 py-1.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              <tr class="bg-indigo-50/50">
+                <td class="px-3 py-1.5 font-medium text-gray-900">Evening Support</td>
+                <td class="px-3 py-1.5 text-gray-500">Maria Garcia · Alex Chen</td>
+                <td class="px-3 py-1.5 text-right"><button class="bg-indigo-600 text-white px-2 py-1 rounded text-[11px] font-semibold">Approve</button></td>
+              </tr>
+              <tr class="bg-indigo-50/50">
+                <td class="px-3 py-1.5 font-medium text-gray-900">Overnight Support</td>
+                <td class="px-3 py-1.5 text-gray-500">David Kim · Priya Patel</td>
+                <td class="px-3 py-1.5 text-right"><button class="bg-indigo-600 text-white px-2 py-1 rounded text-[11px] font-semibold">Approve</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

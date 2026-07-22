@@ -1,0 +1,124 @@
+<!-- @dsCard group="Screens" name="Provider Dashboard — Minimal" subtitle="Same data as baseline, light top nav instead of dark sidebar, borderless surfaces, monochrome + single accent" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CareTime — Dashboard (Minimal)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-white">
+  <div class="min-h-screen flex flex-col">
+
+    <!-- Top nav (light, replaces dark sidebar) -->
+    <header class="border-b border-gray-100">
+      <div class="max-w-6xl mx-auto px-8 h-14 flex items-center justify-between">
+        <div class="flex items-center gap-8">
+          <span class="font-semibold text-gray-900 text-sm tracking-tight">CareTime</span>
+          <nav class="flex items-center gap-6 text-sm">
+            <a class="text-gray-900 font-medium">Dashboard</a>
+            <a class="text-gray-400">Clients</a>
+            <a class="text-gray-400">Workers</a>
+            <a class="text-gray-400">Calendar</a>
+            <a class="text-gray-400">Schedules</a>
+            <a class="text-gray-400">Invoices</a>
+            <a class="text-gray-400">Reports</a>
+            <a class="text-gray-400">Settings</a>
+          </nav>
+        </div>
+        <button class="text-gray-400"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="flex-1">
+      <div class="max-w-6xl mx-auto px-8 py-10">
+        <h1 class="text-3xl font-semibold text-gray-900 tracking-tight">Dashboard</h1>
+        <p class="text-gray-400 text-sm mt-1 mb-10">Welcome back</p>
+
+        <!-- Alerts — thin left-border accent, no colored boxes -->
+        <div class="space-y-4 mb-10">
+          <div class="border-l-2 border-gray-900 pl-4 py-1">
+            <p class="text-sm font-medium text-gray-900">3 activities with no Worker assigned</p>
+            <p class="text-xs text-gray-400 mt-0.5">Assign a Worker below</p>
+          </div>
+          <div class="border-l-2 border-gray-900 pl-4 py-1">
+            <p class="text-sm font-medium text-gray-900">2 shifts awaiting your payment approval</p>
+            <p class="text-xs text-gray-400 mt-0.5">Approve below to mark ready for payment</p>
+          </div>
+        </div>
+
+        <!-- Stats — divided columns, no card chrome -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 border-y border-gray-100 mb-12">
+          <div class="px-6 py-5 first:pl-0">
+            <p class="text-sm text-gray-400">Active Clients</p>
+            <p class="text-4xl font-semibold text-gray-900 mt-1">24</p>
+          </div>
+          <div class="px-6 py-5">
+            <p class="text-sm text-gray-400">Active Workers</p>
+            <p class="text-4xl font-semibold text-gray-900 mt-1">11</p>
+          </div>
+          <div class="px-6 py-5">
+            <p class="text-sm text-gray-400">Activities This Month</p>
+            <p class="text-4xl font-semibold text-gray-900 mt-1">142</p>
+          </div>
+          <div class="px-6 py-5">
+            <p class="text-sm text-gray-400">Awaiting Approval</p>
+            <p class="text-4xl font-semibold text-gray-900 mt-1">5</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16">
+          <!-- Unassigned -->
+          <div>
+            <h2 class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">Unassigned Activities</h2>
+            <div class="divide-y divide-gray-100">
+              <div class="py-4 flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900">Morning Support</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Jane Smith · 14 Jul, 9:00 AM</p>
+                </div>
+                <select class="border border-gray-200 rounded-md px-2 py-1.5 text-xs text-gray-500 flex-shrink-0">
+                  <option>Assign Worker…</option>
+                </select>
+              </div>
+              <div class="py-4 flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900">Community Access</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Tom Lee · 15 Jul, 1:00 PM</p>
+                </div>
+                <select class="border border-gray-200 rounded-md px-2 py-1.5 text-xs text-gray-500 flex-shrink-0">
+                  <option>Assign Worker…</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Awaiting payment -->
+          <div>
+            <h2 class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">Awaiting Payment Approval</h2>
+            <div class="divide-y divide-gray-100">
+              <div class="py-4 flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900">Evening Support</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Maria Garcia · Alex Chen</p>
+                </div>
+                <button class="bg-gray-900 text-white px-3 py-1.5 rounded-md text-xs font-medium flex-shrink-0">Approve</button>
+              </div>
+              <div class="py-4 flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900">Overnight Support</p>
+                  <p class="text-xs text-gray-400 mt-0.5">David Kim · Priya Patel</p>
+                </div>
+                <button class="bg-gray-900 text-white px-3 py-1.5 rounded-md text-xs font-medium flex-shrink-0">Approve</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>
