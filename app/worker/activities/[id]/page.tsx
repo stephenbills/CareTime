@@ -556,12 +556,12 @@ export default function CarerActivityPage() {
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="text-xs text-gray-400">Started</p>
-              <p className="font-medium">{formatTime(activity.actual_start_time)}</p>
+              <p className="font-medium">{formatDateTime(activity.actual_start_time)}</p>
             </div>
             {activity.actual_end_time && (
               <div>
                 <p className="text-xs text-gray-400">Ended</p>
-                <p className="font-medium">{formatTime(activity.actual_end_time)}</p>
+                <p className="font-medium">{formatDateTime(activity.actual_end_time)}</p>
               </div>
             )}
             {activity.mileage && (

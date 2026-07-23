@@ -231,17 +231,30 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array>
   totalRow(`GST (${data.gstRate}%)`, `$${data.gstAmount.toFixed(2)}`)
   totalRow('TOTAL', `$${data.totalAmount.toFixed(2)}`, { bold: true, bg: true })
 
-  // Payment Details — bottom-left
+  // Payment Details + footer — pinned to the bottom of the page instead of
+  // wherever the content cursor happens to land, so they sit in the same
+  // spot regardless of line-item count or address lengths.
   const hasBankDetails = data.bankName || data.bankAccountName || data.bankBsb || data.bankAccountNumber
+  const bankRows: [string, string][] = []
+  if (data.bankName) bankRows.push(['Bank:', data.bankName])
+  if (data.bankAccountName) bankRows.push(['Account Name:', data.bankAccountName])
+  if (data.bankBsb) bankRows.push(['BSB:', data.bankBsb])
+  if (data.bankAccountNumber) bankRows.push(['Account No:', data.bankAccountNumber])
+
+  const paymentBlockHeight = hasBankDetails ? 14 + bankRows.length * 13 : 0
+  const footerHeight = 20
+  const bottomZoneTop = margin + footerHeight + paymentBlockHeight
+
+  // If the totals block already ran past where the bottom zone needs to
+  // start, push it onto a fresh page instead of overlapping the table/totals.
+  if (y < bottomZoneTop) {
+    page = pdf.addPage([pageWidth, pageHeight])
+  }
+  y = bottomZoneTop
+
   if (hasBankDetails) {
-    y -= 12
     drawText('PAYMENT DETAILS', margin, y, { font: fontBold, size: 8, color: rgb(0.5, 0.5, 0.5) })
     y -= 14
-    const bankRows: [string, string][] = []
-    if (data.bankName) bankRows.push(['Bank:', data.bankName])
-    if (data.bankAccountName) bankRows.push(['Account Name:', data.bankAccountName])
-    if (data.bankBsb) bankRows.push(['BSB:', data.bankBsb])
-    if (data.bankAccountNumber) bankRows.push(['Account No:', data.bankAccountNumber])
     for (const [label, value] of bankRows) {
       drawText(label, margin, y, { font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) })
       drawText(value, margin + 85, y, { size: 9 })
@@ -249,9 +262,7 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array>
     }
   }
 
-  // Footer
-  y -= 20
-  drawText('This is a computer-generated invoice from CareTime.', margin, y, {
+  drawText('This is a computer-generated invoice from CareTime.', margin, margin, {
     size: 8, color: rgb(0.6, 0.6, 0.6)
   })
 

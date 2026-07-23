@@ -4,6 +4,31 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 40 — 23 July 2026
+
+### Client Reports, Invoice Fixes, and UI Polish
+
+- **Fixed a cross-provider data leak**: the invoice-generate preview query (`app/provider/invoices/generate/page.tsx`)
+  had no `provider_id` filter — the only such unscoped query in the codebase — so a Worker or
+  Client linked to multiple Providers could leak another Provider's activities into the preview.
+  The actual generation route was already correctly scoped; only the preview was affected
+- New Client-facing Reports page (`app/client/reports/page.tsx`, linked from `/client/details`):
+  date range in, shows shifts with date/day/time/worker/NDIS code/status/cost using the exact
+  same billing formula as real invoice generation, plus a Subtotal/GST/Total summary
+- Providers can now reissue already-invoiced (non-paid) invoices for a Client over a date range —
+  new `POST /api/invoices/reissue`, surfaced as a "Reissue & Regenerate" prompt on the Generate
+  Invoices page when applicable; `paid` invoices are never touched
+- Invoice PDF: Payment Details and the footer are now pinned to a fixed position near the bottom
+  of the page instead of drifting with line-item count or address length (`lib/invoice/pdf.ts`)
+- New shared `lib/dateRange.ts` rule (to-date must be after from-date, defaults to from + 7 days),
+  applied to Client Reports, Provider Reports, and Invoice Generate
+- Client: approving a shift now returns to the previous screen instead of staying put
+- Provider Dashboard: "Awaiting Payment Approval" now shows a count in its heading, and rows are
+  clickable through to the shift detail (the inline Approve button still works independently)
+- Sidebar: Logout moved directly below Settings, no more gap at the bottom of the nav
+- Worker Shift Summary: Started/Ended now show full date + day + time (also fixes overnight
+  shifts, since each end keeps its own correct date instead of assuming same-day)
+
 ## Session 39 — 22 July 2026
 
 ### Worker Field Parity, Provider Visibility, and a Compliance Report

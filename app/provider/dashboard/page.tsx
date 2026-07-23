@@ -234,14 +234,14 @@ export default function DashboardPage() {
 
         {/* Awaiting payment approval — inline approve */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Awaiting Payment Approval</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">Awaiting Payment Approval ({awaitingPayment.length})</h2>
           {awaitingPayment.length === 0 ? (
             <p className="text-sm text-gray-400">No shifts awaiting payment approval.</p>
           ) : (
             <div className="space-y-2">
               {awaitingPayment.slice(0, 8).map((act: any) => (
-                <div key={act.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-indigo-100 bg-indigo-50">
+                <Link key={act.id} href={`/provider/activities/${act.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border border-indigo-100 bg-indigo-50 hover:border-indigo-200 transition-colors">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900">{act.title}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
@@ -250,13 +250,13 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleApprovePayment(act.id)}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleApprovePayment(act.id) }}
                     disabled={approvingId === act.id}
                     className="ml-3 flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex-shrink-0">
                     <CheckCircle size={12} />
                     {approvingId === act.id ? 'Approving…' : 'Approve'}
                   </button>
-                </div>
+                </Link>
               ))}
               {awaitingPayment.length > 8 && (
                 <p className="text-xs text-gray-400 text-center pt-1">+{awaitingPayment.length - 8} more</p>

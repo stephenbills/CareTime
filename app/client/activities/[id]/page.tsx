@@ -177,8 +177,8 @@ export default function ClientActivityPage() {
       })
     }
 
-    await load()
     setActing(false)
+    router.back()
   }
 
   async function handleReject() {

@@ -40,7 +40,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-4 space-y-0.5">
+      <nav className="px-2 py-4 space-y-0.5">
         {nav.map(({ label, href, icon: Icon }) => {
           const active = pathname.startsWith(href)
           return (
@@ -58,9 +58,6 @@ export default function Sidebar() {
             </Link>
           )
         })}
-      </nav>
-
-      <div className="px-2 py-4 border-t border-gray-700">
         <button
           onClick={handleLogout}
           className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white w-full transition-colors"
@@ -68,7 +65,7 @@ export default function Sidebar() {
           <LogOut size={16} />
           Logout
         </button>
-      </div>
+      </nav>
     </aside>
   )
 }

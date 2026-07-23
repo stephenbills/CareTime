@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronRight, Mail, AlertCircle, Clock, Pill } from 'lucide-react'
+import { nextToOnFromChange, clampToOnToChange } from '@/lib/dateRange'
 import Link from 'next/link'
 import { useProviderId } from '@/lib/hooks/useProvider'
 
@@ -86,6 +87,14 @@ export default function ReportsPage() {
     setClients(Object.fromEntries(cls.map((c: any) => [c.id, c])))
     setWorkers(Object.fromEntries(wks.map((w: any) => [w.id, w])))
     setLoading(false)
+  }
+
+  function handleFromChange(v: string) {
+    setDateFrom(v)
+    setDateTo(prev => nextToOnFromChange(v, prev))
+  }
+  function handleToChange(v: string) {
+    setDateTo(clampToOnToChange(v, dateFrom))
   }
 
   async function sendReminder(activity: any) {
@@ -284,12 +293,12 @@ export default function ReportsPage() {
             </select>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-400">From</span>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              <input type="date" value={dateFrom} onChange={e => handleFromChange(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-400">To</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              <input type="date" value={dateTo} onChange={e => handleToChange(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             {(filterClient || dateFrom || dateTo) && (

@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, FileText, Loader2 } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { useProviderId } from '@/lib/hooks/useProvider'
+import { nextToOnFromChange, clampToOnToChange } from '@/lib/dateRange'
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -51,6 +52,8 @@ export default function GenerateInvoicesPage() {
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState('')
+  const [reissuableCount, setReissuableCount] = useState(0)
+  const [reissuing, setReissuing] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const { providerId } = useProviderId()
@@ -74,13 +77,66 @@ export default function GenerateInvoicesPage() {
     load()
   }, [providerId])
 
+  function handleFromChange(v: string) {
+    setPeriodStart(v)
+    setPeriodEnd(prev => nextToOnFromChange(v, prev))
+  }
+  function handleToChange(v: string) {
+    setPeriodEnd(clampToOnToChange(v, periodStart))
+  }
+
+  async function checkReissuable() {
+    if (!clientId) { setReissuableCount(0); return }
+    const { data } = await supabase.from('activities')
+      .select('invoice_id, invoices(status)')
+      .eq('provider_id', providerId)
+      .eq('client_id', clientId)
+      .not('invoice_id', 'is', null)
+      .gte('start_time', new Date(periodStart).toISOString())
+      .lte('start_time', new Date(periodEnd + 'T23:59:59').toISOString())
+
+    const nonPaidInvoiceIds = new Set(
+      (data || [])
+        .filter((a: any) => a.invoices?.status !== 'paid')
+        .map((a: any) => a.invoice_id)
+    )
+    setReissuableCount(nonPaidInvoiceIds.size)
+  }
+
+  async function handleReissue() {
+    setReissuing(true)
+    setError('')
+
+    const res = await fetch('/api/invoices/reissue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ periodStart, periodEnd, clientId }),
+    })
+    const data = await res.json()
+
+    if (!res.ok) {
+      setError(data.error || 'Failed to reissue invoices')
+      setReissuing(false)
+      return
+    }
+
+    setReissuableCount(0)
+    setReissuing(false)
+    await handlePreview()
+  }
+
   async function handlePreview() {
     setLoading(true)
     setError('')
     setPreview(null)
+    checkReissuable()
 
     let query = supabase.from('activities')
       .select('*, clients(name), carers(name), ndis_line_items(line_item_number, description, unit_price)')
+      // SECURITY: scoped to this provider — without this, a shared Worker/Client
+      // linked to multiple Providers leaked the other Provider's activities into
+      // this preview (the actual /api/invoices generation route was already scoped).
+      .eq('provider_id', providerId)
       .gte('start_time', new Date(periodStart).toISOString())
       .lte('start_time', new Date(periodEnd + 'T23:59:59').toISOString())
       .is('invoice_id', null)
@@ -181,12 +237,12 @@ export default function GenerateInvoicesPage() {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-            <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)}
+            <input type="date" value={periodStart} onChange={e => handleFromChange(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-            <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)}
+            <input type="date" value={periodEnd} onChange={e => handleToChange(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
@@ -206,6 +262,19 @@ export default function GenerateInvoicesPage() {
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-6">⚠ {error}</div>
+      )}
+
+      {reissuableCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center justify-between gap-3">
+          <p className="text-sm text-amber-800">
+            {reissuableCount} invoice{reissuableCount !== 1 ? 's' : ''} already generated for this Client in this range.
+          </p>
+          <button onClick={handleReissue} disabled={reissuing}
+            className="flex items-center gap-1.5 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors flex-shrink-0">
+            <RotateCcw size={14} />
+            {reissuing ? 'Reissuing…' : 'Reissue & Regenerate'}
+          </button>
+        </div>
       )}
 
       {/* Step 2: Preview */}

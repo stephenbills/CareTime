@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { notify } from '@/lib/email/notify'
 import Link from 'next/link'
-import { Pill, ListOrdered, ChevronRight } from 'lucide-react'
+import { Pill, ListOrdered, ChevronRight, BarChart2 } from 'lucide-react'
 
 function Field({ label, value, onChange, type = 'text', required = false }: {
   label: string; value: string; onChange: (v: string) => void
@@ -193,6 +193,11 @@ export default function ClientDetails() {
         <Link href="/client/counters" className="flex items-center gap-3 px-4 py-3.5">
           <ListOrdered size={18} className="text-gray-400 flex-shrink-0" />
           <span className="text-sm font-medium text-gray-900 flex-1">Counters</span>
+          <ChevronRight size={16} className="text-gray-300" />
+        </Link>
+        <Link href="/client/reports" className="flex items-center gap-3 px-4 py-3.5">
+          <BarChart2 size={18} className="text-gray-400 flex-shrink-0" />
+          <span className="text-sm font-medium text-gray-900 flex-1">Reports</span>
           <ChevronRight size={16} className="text-gray-300" />
         </Link>
       </div>
