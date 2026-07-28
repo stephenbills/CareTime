@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Check, Printer } from 'lucide-react'
 import Link from 'next/link'
+import { useProviderId } from '@/lib/hooks/useProvider'
 
 const STATUS_STYLE: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -30,10 +31,15 @@ export default function InvoiceDetailPage() {
   const [marking, setMarking] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const { providerId } = useProviderId()
 
   useEffect(() => {
+    if (!providerId) return
     async function load() {
-      const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
+      // SECURITY: scoped to the caller's own provider — an invoice id alone
+      // must not be enough to view or mark as paid someone else's invoice.
+      const { data: inv } = await supabase.from('invoices').select('*')
+        .eq('id', id).eq('provider_id', providerId).maybeSingle()
       if (!inv) { setLoading(false); return }
       setInvoice(inv)
 
@@ -51,13 +57,13 @@ export default function InvoiceDetailPage() {
       setLoading(false)
     }
     load()
-  }, [id])
+  }, [id, providerId])
 
   async function markAsPaid() {
     setMarking(true)
     const { error: err } = await supabase.from('invoices')
       .update({ status: 'paid', paid_at: new Date().toISOString() })
-      .eq('id', id)
+      .eq('id', id).eq('provider_id', providerId)
     if (err) { alert(`Failed to mark invoice as paid: ${err.message}`); setMarking(false); return }
     const { error: actErr } = await supabase.from('activities')
       .update({ status: 'paid' })
@@ -92,9 +98,9 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => window.print()}
+          <button onClick={() => window.open(`/api/invoices/${id}/pdf`, '_blank')}
             className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <Printer size={14} /> Print
+            <Printer size={14} /> Print / Download PDF
           </button>
           {invoice.status !== 'paid' && (
             <button onClick={markAsPaid} disabled={marking}
