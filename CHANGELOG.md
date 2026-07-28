@@ -4,6 +4,28 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 42 — 28 July 2026
+
+### Real Invoice PDF, Client & Worker Dashboards
+
+- Provider Invoices: the "Print" button opened `window.print()` on the on-screen dashboard view,
+  which shows Worker Cost/Margin — figures that must never reach a Client, and it looked nothing
+  like the actual emailed invoice. New `GET /api/invoices/[id]/pdf` regenerates the exact same
+  client-safe PDF on demand; the button now opens it in a new tab (print + download via the
+  browser's own PDF viewer)
+- Found and fixed a real security gap while in that file: the invoice detail page's load query
+  and "Mark as Paid" action had no `provider_id` scoping — any authenticated user who knew an
+  invoice id could view or mark another Provider's invoice as paid
+- Client home page (`app/client/dashboard/page.tsx`) redesigned: "Needs Your Approval" stays
+  always visible, the always-shown Upcoming Activities list is now two click-to-reveal boxes
+  (Upcoming Activities, Reports) — Reports was previously only reachable from My Details
+- Worker home page (`app/worker/dashboard/page.tsx`) redesigned into 3 click-to-reveal boxes:
+  Today (reveals the separate Upcoming/future-scheduled list), Awaiting Acceptance (reveals its
+  own list), and new Completed Shifts — shifts completed and not yet invoiced
+  (`awaiting_payment_approval`/`ready_for_payment`, `invoice_id is null`), showing the payment
+  due per shift using the same calculation as real invoice generation, just on the worker-pay
+  side. Today's Activities detail list stays always visible below the boxes
+
 ## Session 41 — 28 July 2026
 
 ### Invoice PDF Layout Fixes

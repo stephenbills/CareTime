@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Clock, CheckCircle, ChevronRight, Calendar } from 'lucide-react'
+import { Clock, CheckCircle, ChevronRight, Calendar, BarChart2 } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -45,6 +45,7 @@ export default function ClientDashboard() {
   const [upcoming, setUpcoming] = useState<any[]>([])
   const [workers, setWorkers] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<'upcoming' | 'reports' | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -145,39 +146,70 @@ export default function ClientDashboard() {
         </div>
       )}
 
-      {/* Upcoming */}
-      {upcoming.length > 0 && (
+      {/* Dashboard boxes */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => setExpanded(prev => prev === 'upcoming' ? null : 'upcoming')}
+          className={`text-left rounded-2xl border p-4 shadow-sm transition-colors ${
+            expanded === 'upcoming' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100'
+          }`}>
+          <Calendar size={18} className={expanded === 'upcoming' ? 'text-blue-500' : 'text-gray-300'} />
+          <p className="text-3xl font-bold text-gray-900 mt-2">{upcoming.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Upcoming Activities</p>
+        </button>
+        <button onClick={() => setExpanded(prev => prev === 'reports' ? null : 'reports')}
+          className={`text-left rounded-2xl border p-4 shadow-sm transition-colors ${
+            expanded === 'reports' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100'
+          }`}>
+          <BarChart2 size={18} className={expanded === 'reports' ? 'text-blue-500' : 'text-gray-300'} />
+          <p className="text-sm font-semibold text-gray-900 mt-2">Reports</p>
+          <p className="text-xs text-gray-500 mt-0.5">View available reports</p>
+        </button>
+      </div>
+
+      {expanded === 'upcoming' && (
         <div>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Upcoming Activities</h2>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-            {upcoming.map(act => (
-              <Link key={act.id} href={`/client/activities/${act.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{act.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {formatDate(act.start_time)} · {formatTime(act.start_time)}
-                  </p>
-                  {act.carer_id && (
-                    <p className="text-xs text-gray-300 mt-0.5">{workers[act.carer_id] || '—'}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[act.status] || 'bg-gray-100 text-gray-500'}`}>
-                    {STATUS_LABELS[act.status] || act.status}
-                  </span>
-                  <ChevronRight size={15} className="text-gray-300" />
-                </div>
-              </Link>
-            ))}
-          </div>
+          {upcoming.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+              <p className="text-gray-400 text-sm">No upcoming activities.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+              {upcoming.map(act => (
+                <Link key={act.id} href={`/client/activities/${act.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{act.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(act.start_time)} · {formatTime(act.start_time)}
+                    </p>
+                    {act.carer_id && (
+                      <p className="text-xs text-gray-300 mt-0.5">{workers[act.carer_id] || '—'}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[act.status] || 'bg-gray-100 text-gray-500'}`}>
+                      {STATUS_LABELS[act.status] || act.status}
+                    </span>
+                    <ChevronRight size={15} className="text-gray-300" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {pendingApproval.length === 0 && upcoming.length === 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
-          <Calendar size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No upcoming activities.</p>
+      {expanded === 'reports' && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Reports</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+            <Link href="/client/reports"
+              className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+              <span className="text-sm font-medium text-gray-900">Shift Report</span>
+              <ChevronRight size={15} className="text-gray-300" />
+            </Link>
+          </div>
         </div>
       )}
     </div>

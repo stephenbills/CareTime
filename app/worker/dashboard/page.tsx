@@ -35,12 +35,37 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
+// Same formula as app/api/invoices/route.ts, mirrored for the Worker's own
+// pay side (worker_pay_pct instead of client_charge_pct), same approach as
+// app/client/reports/page.tsx uses for the Client-facing figure.
+function calcDurationHours(act: any) {
+  const startStr = act.actual_start_time || act.start_time
+  const endStr = act.actual_end_time || act.end_time
+  const s = new Date(startStr)
+  const e = new Date(endStr)
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0
+  let ms = e.getTime() - s.getTime()
+  if (ms <= 0) ms += 24 * 60 * 60 * 1000
+  return Math.round((ms / 3600000) * 100) / 100
+}
+
+function calcWorkerAmount(act: any) {
+  const ndis = act.ndis_line_items
+  const provider = act.providers
+  const unitPrice = ndis?.unit_price || 0
+  const workerPct = ndis?.worker_pay_pct_override ?? provider?.worker_pay_pct ?? 62
+  const hours = calcDurationHours(act)
+  return Math.round(((unitPrice * workerPct) / 100) * hours * 100) / 100
+}
+
 export default function CarerDashboard() {
   const [worker, setCarer] = useState<any>(null)
   const [todayActs, setTodayActs] = useState<any[]>([])
   const [awaitingList, setAwaitingList] = useState<any[]>([])
   const [upcoming, setUpcoming] = useState<any[]>([])
+  const [completedShifts, setCompletedShifts] = useState<any[]>([])
   const [clients, setClients] = useState<Record<string, string>>({})
+  const [expanded, setExpanded] = useState<'today' | 'awaiting' | 'completed' | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -61,7 +86,7 @@ export default function CarerDashboard() {
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
       const futureEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
 
-      const [{ data: today }, { data: upcomingScheduled }, { data: awaiting }, { data: cls }] = await Promise.all([
+      const [{ data: today }, { data: upcomingScheduled }, { data: awaiting }, { data: cls }, { data: completed }] = await Promise.all([
         supabase.from('activities').select('*')
           .eq('carer_id', carerData.id)
           .gte('start_time', todayStart)
@@ -80,6 +105,14 @@ export default function CarerDashboard() {
           .gte('start_time', todayStart)
           .order('start_time'),
         supabase.from('clients').select('id, name'),
+        // Completed and not yet invoiced — matches the eligibility query
+        // app/api/invoices/route.ts uses when generating invoices.
+        supabase.from('activities')
+          .select('*, providers(worker_pay_pct), ndis_line_items(unit_price, worker_pay_pct_override)')
+          .eq('carer_id', carerData.id)
+          .in('status', ['awaiting_payment_approval', 'ready_for_payment'])
+          .is('invoice_id', null)
+          .order('start_time', { ascending: false }),
       ])
 
       // Collapse a recurring schedule's occurrences down to a single (earliest) entry —
@@ -96,6 +129,7 @@ export default function CarerDashboard() {
       setTodayActs(today || [])
       setUpcoming(upcomingScheduled || [])
       setAwaitingList(dedupedAwaiting)
+      setCompletedShifts(completed || [])
       setClients(Object.fromEntries((cls || []).map((c: any) => [c.id, c.name])))
       setLoading(false)
     }
@@ -124,39 +158,116 @@ export default function CarerDashboard() {
         <h1 className="text-xl font-bold text-gray-900">{worker.name}</h1>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+      {/* Stats row -> 3 click-to-reveal boxes */}
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => setExpanded(prev => prev === 'today' ? null : 'today')}
+          className={`text-left rounded-2xl border p-3 shadow-sm transition-colors ${
+            expanded === 'today' ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100'
+          }`}>
           <p className="text-xs text-gray-400 mb-1">Today</p>
-          <p className="text-3xl font-bold text-gray-900">{todayActs.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{todayActs.length}</p>
           <p className="text-xs text-gray-500 mt-0.5">activit{todayActs.length !== 1 ? 'ies' : 'y'}</p>
-        </div>
-        <div className={`rounded-2xl border p-4 shadow-sm ${awaitingList.length > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-100'}`}>
+        </button>
+        <button onClick={() => setExpanded(prev => prev === 'awaiting' ? null : 'awaiting')}
+          className={`text-left rounded-2xl border p-3 shadow-sm transition-colors ${
+            expanded === 'awaiting' ? 'bg-yellow-50 border-yellow-200' : awaitingList.length > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-100'
+          }`}>
           <p className={`text-xs mb-1 ${awaitingList.length > 0 ? 'text-yellow-600' : 'text-gray-400'}`}>Awaiting</p>
-          <p className={`text-3xl font-bold ${awaitingList.length > 0 ? 'text-yellow-700' : 'text-gray-900'}`}>{awaitingList.length}</p>
+          <p className={`text-2xl font-bold ${awaitingList.length > 0 ? 'text-yellow-700' : 'text-gray-900'}`}>{awaitingList.length}</p>
           <p className={`text-xs mt-0.5 ${awaitingList.length > 0 ? 'text-yellow-600' : 'text-gray-500'}`}>acceptance</p>
-        </div>
+        </button>
+        <button onClick={() => setExpanded(prev => prev === 'completed' ? null : 'completed')}
+          className={`text-left rounded-2xl border p-3 shadow-sm transition-colors ${
+            expanded === 'completed' ? 'bg-green-50 border-green-200' : completedShifts.length > 0 ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'
+          }`}>
+          <p className={`text-xs mb-1 ${completedShifts.length > 0 ? 'text-green-600' : 'text-gray-400'}`}>Completed</p>
+          <p className={`text-2xl font-bold ${completedShifts.length > 0 ? 'text-green-700' : 'text-gray-900'}`}>{completedShifts.length}</p>
+          <p className={`text-xs mt-0.5 ${completedShifts.length > 0 ? 'text-green-600' : 'text-gray-500'}`}>shifts</p>
+        </button>
       </div>
 
       {/* Awaiting Acceptance */}
-      {awaitingList.length > 0 && (
+      {expanded === 'awaiting' && (
         <div>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Awaiting Acceptance</h2>
-          <div className="bg-white rounded-2xl border border-yellow-200 shadow-sm divide-y divide-gray-50">
-            {awaitingList.map(act => (
-              <Link key={act.id} href={`/worker/activities/${act.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{act.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {formatDate(act.start_time)} · {formatTime(act.start_time)}
-                    {act.client_id && ` · ${clients[act.client_id] || '—'}`}
-                  </p>
-                </div>
-                <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
-              </Link>
-            ))}
-          </div>
+          {awaitingList.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+              <p className="text-gray-400 text-sm">Nothing awaiting acceptance.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-yellow-200 shadow-sm divide-y divide-gray-50">
+              {awaitingList.map(act => (
+                <Link key={act.id} href={`/worker/activities/${act.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{act.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(act.start_time)} · {formatTime(act.start_time)}
+                      {act.client_id && ` · ${clients[act.client_id] || '—'}`}
+                    </p>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Upcoming — this is what the Today Activities box reveals */}
+      {expanded === 'today' && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Upcoming</h2>
+          {upcoming.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+              <p className="text-gray-400 text-sm">Nothing upcoming yet.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+              {upcoming.map(act => (
+                <Link key={act.id} href={`/worker/activities/${act.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{act.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(act.start_time)} · {formatTime(act.start_time)}
+                    </p>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Completed Shifts — ready for invoicing, with payment due per shift */}
+      {expanded === 'completed' && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Completed Shifts</h2>
+          {completedShifts.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+              <p className="text-gray-400 text-sm">No completed shifts awaiting invoicing.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-green-200 shadow-sm divide-y divide-gray-50">
+              {completedShifts.map(act => (
+                <Link key={act.id} href={`/worker/activities/${act.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{act.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(act.start_time)}
+                      {act.client_id && ` · ${clients[act.client_id] || '—'}`}
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-green-700 flex-shrink-0">
+                    ${calcWorkerAmount(act).toFixed(2)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -202,28 +313,7 @@ export default function CarerDashboard() {
         </div>
       )}
 
-      {/* Upcoming */}
-      {upcoming.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Upcoming</h2>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-            {upcoming.map(act => (
-              <Link key={act.id} href={`/worker/activities/${act.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{act.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {formatDate(act.start_time)} · {formatTime(act.start_time)}
-                  </p>
-                </div>
-                <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {todayActs.length === 0 && upcoming.length === 0 && awaitingList.length === 0 && (
+      {expanded === null && todayActs.length === 0 && awaitingList.length === 0 && completedShifts.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
           <Calendar size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">No activities scheduled.</p>
