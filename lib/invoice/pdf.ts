@@ -206,8 +206,11 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array>
       drawText(truncated, colWorker.x, y, { size: 7.5, color: rgb(0.55, 0.55, 0.55) })
     }
 
-    y -= 14
-    drawLine(margin, y + 4, pageWidth - margin, rgb(0.93, 0.93, 0.93))
+    // Divider sits clear of both the NDIS line above and the next row's
+    // text below it, instead of running through the next row's letters.
+    y -= 8
+    drawLine(margin, y, pageWidth - margin, rgb(0.93, 0.93, 0.93))
+    y -= 10
   }
 
   // Totals — Subtotal, GST, then the bold Total
@@ -218,7 +221,10 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array>
   function totalRow(label: string, value: string, opts?: { bold?: boolean; bg?: boolean; size?: number }) {
     const size = opts?.size ?? (opts?.bold ? 11 : 9)
     if (opts?.bg) {
-      page.drawRectangle({ x: margin, y: y - 5, width: contentWidth, height: 22, color: rgb(0.96, 0.96, 0.96) })
+      // Extra clearance above a highlighted row so its background doesn't
+      // creep up into the row above (previously it overlapped the GST line).
+      y -= 8
+      page.drawRectangle({ x: margin, y: y - 5, width: contentWidth, height: size + 10, color: rgb(0.96, 0.96, 0.96) })
     }
     const f = opts?.bold ? fontBold : font
     const color = opts?.bold ? rgb(0.1, 0.1, 0.1) : rgb(0.4, 0.4, 0.4)

@@ -4,6 +4,18 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 41 — 28 July 2026
+
+### Invoice PDF Layout Fixes
+
+- Fixed the light divider line between shift rows running through the following row's text —
+  row spacing was too tight (divider sat only 4pt above the next row's baseline); redistributed
+  the gaps so there's clear whitespace above and below each divider
+- Fixed the TOTAL row's shaded highlight box overlapping the GST row above it by 1pt; added
+  clearance before the highlighted row so it stays fully within its own row
+- Verified both fixes by generating a real multi-line-item test PDF through the actual code and
+  reading it back, not just by inspecting the coordinate math
+
 ## Session 40 — 23 July 2026
 
 ### Client Reports, Invoice Fixes, and UI Polish
