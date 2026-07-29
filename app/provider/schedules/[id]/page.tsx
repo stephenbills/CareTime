@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import RecurrencePicker from '@/components/RecurrencePicker'
 import { useProviderId } from '@/lib/hooks/useProvider'
+import { RRule } from 'rrule'
 
 const DURATIONS = [
   { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
@@ -33,6 +34,11 @@ function timeOptions() {
   return opts
 }
 const TIME_OPTS = timeOptions()
+
+function localDateStr(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
 
 function Field({ label, value, onChange, type = 'text', required = false, placeholder = '' }: any) {
   return (
@@ -182,6 +188,75 @@ export default function ScheduleFormPage() {
     } else {
       const { error: err } = await supabase.from('recurring_schedules').update(payload).eq('id', id)
       if (err) { setError(err.message); setSaving(false); return }
+
+      // Cascade the edit to already-generated, not-yet-completed activities —
+      // previously only the recurring_schedules template was updated, so
+      // existing shifts on the calendar kept their stale values (the
+      // "changes don't seem to be saved" bug).
+      const { data: siblings, error: fetchErr } = await supabase
+        .from('activities').select('id, start_time')
+        .eq('recurring_schedule_id', id)
+        .in('status', ['awaiting_acceptance', 'scheduled'])
+      if (fetchErr) { setError(fetchErr.message); setSaving(false); return }
+
+      const [sh, sm] = startTime.split(':').map(Number)
+      const existingDates = new Set<string>()
+      for (const sib of siblings || []) {
+        const d = new Date(sib.start_time)
+        existingDates.add(localDateStr(d))
+        const start = new Date(d); start.setHours(sh, sm, 0, 0)
+        const end = new Date(start); end.setMinutes(end.getMinutes() + durationMins)
+        const { error: patchErr } = await supabase.from('activities').update({
+          title: title.trim(),
+          description: description || null,
+          client_id: clientId,
+          carer_id: carerId || null,
+          ndis_line_item_id: ndisItemId || null,
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          pickup_address: pickupAddress || null,
+          dropoff_address: dropoffAddress || null,
+          venue_address: venueAddress || null,
+        }).eq('id', sib.id)
+        if (patchErr) { setError(patchErr.message); setSaving(false); return }
+      }
+
+      // If the recurrence pattern itself changed, add any newly-implied
+      // future occurrences that don't already exist — existing occurrences
+      // are never deleted here.
+      if (rruleStr && rruleStr !== initialRRule) {
+        const rule = RRule.fromString(rruleStr)
+        const now = new Date(); now.setHours(0, 0, 0, 0)
+        const chosenStart = new Date(`${validFrom}T00:00:00`)
+        const searchStart = now > chosenStart ? now : chosenStart
+        const until = new Date(searchStart); until.setDate(until.getDate() + 28)
+        const occurrences = rule.between(searchStart, until, true)
+        const newRows = occurrences
+          .filter(occ => !existingDates.has(localDateStr(occ)))
+          .map(occ => {
+            const start = new Date(occ); start.setHours(sh, sm, 0, 0)
+            const end = new Date(start); end.setMinutes(end.getMinutes() + durationMins)
+            return {
+              recurring_schedule_id: id,
+              provider_id: payload.provider_id,
+              client_id: clientId,
+              carer_id: carerId || null,
+              ndis_line_item_id: ndisItemId || null,
+              title: title.trim(),
+              description: description || null,
+              status: 'awaiting_acceptance',
+              start_time: start.toISOString(),
+              end_time: end.toISOString(),
+              pickup_address: pickupAddress || null,
+              dropoff_address: dropoffAddress || null,
+              venue_address: venueAddress || null,
+            }
+          })
+        if (newRows.length > 0) {
+          const { error: insErr } = await supabase.from('activities').insert(newRows)
+          if (insErr) { setError(insErr.message); setSaving(false); return }
+        }
+      }
     }
 
     setSaving(false)
