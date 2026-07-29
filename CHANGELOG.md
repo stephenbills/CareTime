@@ -4,6 +4,32 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 45 — 29 July 2026
+
+### Fix Reset/Invite Links Being Consumed Before the Real Click
+
+- A newly-invited Provider reported their "Set Your Password" link showing "expired" on the
+  very first click, then "Forgot Password" also failing. Root cause: the emailed link pointed
+  directly at Supabase's hosted verify endpoint, which consumes the one-time recovery token on
+  the *first* GET request it receives — including one made by a corporate email security
+  scanner (Microsoft Safe Links, Proofpoint, etc.) prefetching links in the inbox before the
+  human ever clicks, well before any real time-based expiry
+- New `app/auth/verify-link` interstitial page: the invite and reset-password emails now link
+  here first, showing a "Continue" button that only navigates to the real Supabase verify link
+  on an actual click — an automated prefetch just lands on a harmless static page instead of
+  consuming the token. Wired into `app/api/invite/route.ts` and `app/api/reset-password/route.ts`
+- The second symptom ("Failed to send reset email") had a separate root cause, found from the
+  Vercel request log: `POST /api/reset-password` was coming back **307**, and since a 307
+  preserves the original method, the browser's `fetch` re-POSTed to the redirect target,
+  `/auth/login` — a GET-only page — which 405'd, and that non-JSON error response is what threw
+  and produced the generic fallback message. `middleware.ts`'s auth guard was redirecting any
+  unauthenticated request outside `publicPaths` to `/auth/login`, including API routes — breaking
+  password reset specifically, since requesting one is by definition done while logged out. Fixed
+  by exempting `/api/*` from the redirect gate entirely (every route already enforces its own auth
+  via `requireProvider()`/`requireUser()` except `/api/reset-password`, which must stay public by
+  design) and adding `/auth/verify-link` to `publicPaths` so the fix above actually works for a
+  logged-out visitor
+
 ## Session 44 — 29 July 2026
 
 ### Auto-Extend Recurring Schedules on Provider Login
