@@ -4,6 +4,24 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 44 — 29 July 2026
+
+### Auto-Extend Recurring Schedules on Provider Login
+
+- Recurring shifts previously only materialized as real `activities` rows for a rolling 4-week
+  window that a Provider had to manually extend via a "Generate" click per schedule
+  (`app/provider/schedules/page.tsx`) — meaning a Worker couldn't see or reject a shift further
+  out than whatever had already been generated (e.g. to flag a planned holiday months ahead)
+- New `lib/schedules/ensureGenerated.ts` checks each of a Provider's active recurring schedules
+  on every login/session entry (wired into `app/provider/layout.tsx`, which already runs once per
+  real session — no new infrastructure needed) and extends any that have less than 4 weeks of
+  activities generated ahead, reusing the rrule-expansion + dedup approach from the Session 43
+  schedule-edit cascade fix. Wrapped in try/catch — a failure here never blocks the Provider from
+  loading their app
+- This is a zero-infra first step; a real scheduled job (cron/Edge Function) would keep the
+  window extended even for Providers who don't log in often, and can reuse this same generation
+  logic later without changes
+
 ## Session 42 — 28 July 2026
 
 ### Real Invoice PDF, Client & Worker Dashboards
