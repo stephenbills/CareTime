@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not generate reset link' }, { status: 500 })
     }
 
+    // Route through a click-gated interstitial instead of emailing the raw
+    // Supabase verify link directly — see app/auth/verify-link/page.tsx for why.
+    const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(resetLink)}`
+
     // Send via Brevo API directly
     const html = `
 <!DOCTYPE html>
@@ -70,7 +74,7 @@ export async function POST(req: NextRequest) {
             <table cellpadding="0" cellspacing="0" style="margin:20px 0;">
               <tr>
                 <td style="background-color:#2563eb;border-radius:8px;">
-                  <a href="${resetLink}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+                  <a href="${gatedLink}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
                     Reset Password
                   </a>
                 </td>

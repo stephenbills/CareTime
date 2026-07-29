@@ -121,6 +121,12 @@ export async function POST(req: NextRequest) {
       } else {
         const resetLink = linkData?.properties?.action_link
         if (resetLink) {
+          // Route through a click-gated interstitial instead of emailing the
+          // raw Supabase verify link directly — a corporate email scanner
+          // prefetching the link would otherwise consume the one-time token
+          // before the person ever clicks, making it look "expired" on the
+          // very first genuine click.
+          const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(resetLink)}`
           // Send via Brevo API directly — bypasses Supabase SMTP
           const resetHtml = `
 <!DOCTYPE html><html><head><meta charset="utf-8" /></head>
@@ -138,7 +144,7 @@ export async function POST(req: NextRequest) {
   </p>
   <table cellpadding="0" cellspacing="0"><tr>
     <td style="background-color:#2563eb;border-radius:8px;">
-      <a href="${resetLink}" style="display:inline-block;padding:10px 20px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">
+      <a href="${gatedLink}" style="display:inline-block;padding:10px 20px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">
         Set My Password
       </a>
     </td>
