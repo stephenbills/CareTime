@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Mail } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ProviderFormPage() {
@@ -20,22 +20,53 @@ export default function ProviderFormPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(!isNew)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState('')
 
   useEffect(() => {
     if (!isNew && id) {
       supabase.from('providers').select('*').eq('id', id).single().then(({ data: p, error }) => {
         if (error) setError(error.message)
-        if (p) setData({
-          name: p.name || '', email: p.email || '', phone: p.phone || '', abn: p.abn || '',
-          address_line1: p.address_line1 || '', suburb: p.suburb || '',
-          state: p.state || 'NSW', postcode: p.postcode || '',
-          client_charge_pct: p.client_charge_pct?.toString() || '100',
-          worker_pay_pct: p.worker_pay_pct?.toString() || '62',
-        })
+        if (p) {
+          setData({
+            name: p.name || '', email: p.email || '', phone: p.phone || '', abn: p.abn || '',
+            address_line1: p.address_line1 || '', suburb: p.suburb || '',
+            state: p.state || 'NSW', postcode: p.postcode || '',
+            client_charge_pct: p.client_charge_pct?.toString() || '100',
+            worker_pay_pct: p.worker_pay_pct?.toString() || '62',
+          })
+          setUserId(p.user_id || null)
+        }
         setLoading(false)
       })
     }
   }, [id])
+
+  async function handleInvite() {
+    if (!data.email.trim()) { setError('Email address is required to send an invitation'); return }
+    setInviting(true)
+    setInviteMsg('')
+    setError('')
+
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: data.email.trim(), name: data.name, role: 'provider', recordId: id }),
+    })
+    const result = await res.json()
+
+    if (!res.ok) {
+      setError(result.error || 'Failed to send invitation')
+    } else {
+      setInviteMsg(`Invitation sent to ${data.email.trim()}`)
+      const { data: updated } = await supabase
+        .from('providers').select('user_id').eq('id', id).single()
+      if (updated?.user_id) setUserId(updated.user_id)
+      setTimeout(() => setInviteMsg(''), 4000)
+    }
+    setInviting(false)
+  }
 
   function set(field: string, value: string) {
     setData(prev => ({ ...prev, [field]: value }))
@@ -143,6 +174,36 @@ export default function ProviderFormPage() {
             </div>
           </div>
         </div>
+
+        {!isNew && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <h2 className="font-semibold text-gray-900">App Access</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {userId ? 'Invited' : 'Not yet invited'}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {userId
+                    ? 'This provider has a login account. Resend invite if they need a new link.'
+                    : 'Send an invitation so this provider can log in to CareTime.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleInvite}
+                disabled={inviting || !data.email.trim()}
+                className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                <Mail size={14} />
+                {inviting ? 'Sending…' : userId ? 'Resend Invite' : 'Send Invite'}
+              </button>
+            </div>
+            {inviteMsg && (
+              <p className="text-green-600 text-sm">✓ {inviteMsg}</p>
+            )}
+          </div>
+        )}
 
         {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">⚠ {error}</div>}
 

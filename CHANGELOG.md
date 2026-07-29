@@ -4,6 +4,15 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 46 — 29 July 2026
+
+### Resend Invitation on the Admin Provider Page
+
+- `app/admin/providers/[id]/page.tsx` gained an "App Access" section (Send Invite / Resend
+  Invite), matching the pattern already used on the Provider's own Client/Worker detail pages —
+  `/api/invite` already supported Administrators inviting the `provider` role, there was just no
+  UI for it
+
 ## Session 45 — 29 July 2026
 
 ### Fix Reset/Invite Links Being Consumed Before the Real Click
