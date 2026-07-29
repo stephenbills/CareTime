@@ -22,6 +22,21 @@ All notable changes to CareTime are documented here.
   window extended even for Providers who don't log in often, and can reuse this same generation
   logic later without changes
 
+## Session 43 — 29 July 2026
+
+### Fix Recurring Schedule Edits Not Reaching Already-Generated Shifts (Issue #1)
+
+- Provider editing a recurring schedule (`app/provider/schedules/[id]/page.tsx`) only ever updated
+  the `recurring_schedules` template row — already-generated `activities` (what actually shows on
+  calendars/dashboards) kept their stale title/time/worker/NDIS item/addresses, which read as "the
+  changes don't seem to be saved." Mirrors the cascade pattern already used on the Client's own
+  recurring-activity edit (`app/client/activities/[id]/page.tsx`, Session 34): after the schedule
+  update, every not-yet-completed sibling `activities` row is patched to match, and if the
+  recurrence pattern itself changed, newly-implied occurrences in the next 28 days are inserted
+  without deleting anything existing
+- Also verified (no changes needed): Add Worker already links `provider_carers` correctly, and the
+  password-reset hang from the same GitHub issue was already fixed in Sessions 34/35
+
 ## Session 42 — 28 July 2026
 
 ### Real Invoice PDF, Client & Worker Dashboards
