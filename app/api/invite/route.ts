@@ -125,14 +125,22 @@ export async function POST(req: NextRequest) {
     if (resetError) {
       console.warn('[/api/invite] generateLink error:', resetError.message)
     } else {
-      const resetLink = linkData?.properties?.action_link
-      if (resetLink) {
-        // Route through a click-gated interstitial instead of emailing the
-        // raw Supabase verify link directly — a corporate email scanner
-        // prefetching the link would otherwise consume the one-time token
-        // before the person ever clicks, making it look "expired" on the
-        // very first genuine click.
-        const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(resetLink)}`
+      // Link straight to our own page with the hashed token, verified via
+      // supabase.auth.verifyOtp() — NOT Supabase's action_link, which
+      // redirects with a PKCE ?code= requiring a code_verifier stored by
+      // whichever browser initiated the flow. Since this link is generated
+      // entirely server-side (no browser ever initiates it), no verifier
+      // can ever exist, so exchangeCodeForSession() always failed with
+      // "invalid or expired" regardless of timing — confirmed via
+      // Supabase's own auth logs showing /verify succeeding while our
+      // page's code exchange still failed.
+      const hashedToken = linkData?.properties?.hashed_token
+      if (hashedToken) {
+        const directLink = `${resetUrl}?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`
+        // Still route through a click-gated interstitial — the token is
+        // still one-time-use, so an automated email scanner prefetching
+        // the link would consume it before the person ever clicks.
+        const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(directLink)}`
         // Send via Brevo API directly — bypasses Supabase SMTP
         const resetHtml = `
 <!DOCTYPE html><html><head><meta charset="utf-8" /></head>

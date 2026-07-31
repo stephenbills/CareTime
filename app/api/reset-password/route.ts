@@ -39,17 +39,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    const resetLink = data?.properties?.action_link
-    console.log('[/api/reset-password] Link generated:', !!resetLink)
+    // Link straight to our own page with the hashed token, verified via
+    // supabase.auth.verifyOtp() — NOT Supabase's action_link, which redirects
+    // with a PKCE ?code= requiring a code_verifier stored by whichever
+    // browser initiated the flow. Since this link is generated entirely
+    // server-side (no browser ever initiates it), no verifier can ever
+    // exist, so exchangeCodeForSession() always failed with "invalid or
+    // expired" regardless of timing.
+    const hashedToken = data?.properties?.hashed_token
+    console.log('[/api/reset-password] Link generated:', !!hashedToken)
 
-    if (!resetLink) {
-      console.error('[/api/reset-password] No action_link in response:', JSON.stringify(data))
+    if (!hashedToken) {
+      console.error('[/api/reset-password] No hashed_token in response:', JSON.stringify(data))
       return NextResponse.json({ error: 'Could not generate reset link' }, { status: 500 })
     }
 
-    // Route through a click-gated interstitial instead of emailing the raw
-    // Supabase verify link directly — see app/auth/verify-link/page.tsx for why.
-    const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(resetLink)}`
+    const directLink = `${APP_URL}/auth/reset-password?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`
+    // Still route through a click-gated interstitial — the token is still
+    // one-time-use, so an automated email scanner prefetching the link
+    // would consume it before the person ever clicks.
+    const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(directLink)}`
 
     // Send via Brevo API directly
     const html = `

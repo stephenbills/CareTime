@@ -35,14 +35,35 @@ function ResetForm() {
       }
     )
 
-    // createBrowserClient (@supabase/ssr) uses the PKCE flow, so the recovery link
-    // redirects here with ?code=... rather than tokens in the URL hash — unlike the
-    // implicit flow, this is NOT exchanged for a session automatically and must be
-    // done explicitly, otherwise no session (and no PASSWORD_RECOVERY event) is ever
-    // produced — which is why every link, valid or not, was ending up at the
-    // "invalid or expired" error.
+    // Our invite/reset-password emails link here with ?token_hash=...&type=recovery
+    // (from generateLink's properties.hashed_token), verified via verifyOtp() — this
+    // needs no browser-stored state, unlike the PKCE code-exchange path below, which
+    // requires a code_verifier that only exists in a browser that itself initiated
+    // the flow. Since these links are generated entirely server-side (no browser
+    // ever initiates them), that verifier can never exist, so exchangeCodeForSession
+    // always failed with "invalid or expired" here regardless of timing — confirmed
+    // via Supabase's own auth logs showing the underlying /verify call succeeding
+    // while the code exchange still failed.
+    const tokenHash = searchParams?.get('token_hash')
+    const otpType = searchParams?.get('type')
+    // Kept as a fallback for any older/other flow that still lands here with a PKCE
+    // ?code= (e.g. Supabase's own hosted action_link, if ever used directly again).
     const code = searchParams?.get('code')
-    if (code && !exchangeStarted.current) {
+
+    if (tokenHash && !exchangeStarted.current) {
+      exchangeStarted.current = true
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType || 'recovery' }).then(({ data, error: otpErr }) => {
+        if (settled) return
+        if (otpErr) {
+          setSessionError('This password reset link is invalid or has expired. Please ask for a new invitation.')
+          return
+        }
+        settled = true
+        setSessionReady(true)
+        const email = data.session?.user?.email || data.user?.email
+        if (email) setUserEmail(email)
+      })
+    } else if (code && !exchangeStarted.current) {
       exchangeStarted.current = true
       supabase.auth.exchangeCodeForSession(code).then(({ data, error: exchErr }) => {
         if (settled) return

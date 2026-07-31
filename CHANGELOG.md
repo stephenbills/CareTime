@@ -4,6 +4,29 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 48 — 31 July 2026
+
+### Fix the Real Cause of "This Password Reset Link Is Invalid or Has Expired"
+
+- After Session 45/47's fixes, invite/reset-password links still failed every time with this
+  message, even on a genuine, well-timed human click. Supabase's own Auth Logs showed why: the
+  underlying `/auth/v1/verify` call was succeeding server-side (issuing a fresh `?code=`), but our
+  page's `exchangeCodeForSession(code)` call still failed
+- Root cause: `exchangeCodeForSession` is PKCE code exchange, which requires a `code_verifier`
+  stored in whichever browser *initiated* the auth flow. These links are generated entirely
+  server-side via `admin.auth.admin.generateLink()` — no browser ever initiates anything — so
+  that verifier could never exist, for anyone, on any device. This made the reset flow
+  structurally unable to succeed regardless of timing, domain config, or token freshness
+- Fixed by switching to `generateLink`'s `hashed_token` + `supabase.auth.verifyOtp({ token_hash,
+  type })` instead of `action_link` + `exchangeCodeForSession(code)` — `verifyOtp` validates the
+  token directly against Supabase's server record and needs no locally-stored state, so it works
+  regardless of which browser/device opens the email link. Verified the exact field names and
+  method signatures against the installed `@supabase/auth-js` type definitions before relying on
+  them. `app/api/invite/route.ts` and `app/api/reset-password/route.ts` now build the emailed
+  link (still routed through the Session 45 click-gate interstitial) from `hashed_token`;
+  `app/auth/reset-password/page.tsx` tries `verifyOtp` first, falling back to the old
+  `exchangeCodeForSession` path only if a bare `?code=` shows up with no `token_hash`
+
 ## Session 47 — 31 July 2026
 
 ### Fix Invite Email Reliability and Make Resend Invite Actually Work
