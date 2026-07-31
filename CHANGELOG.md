@@ -4,6 +4,21 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 49 — 31 July 2026
+
+### Don't Re-Invite Someone Who Already Has a Working Account
+
+- Adding a Client/Worker who already exists in the system (e.g. linked to a *different* Provider
+  already) still sent them a "Set Your Password" and welcome email every time — confusing, since
+  they already have working credentials and don't need either
+- `app/api/invite/route.ts` now checks the existing auth user's `last_sign_in_at`: if they've
+  never actually signed in (still sitting on the original random temp password), they still get
+  both emails as before, same as a brand-new user. If they've signed in before (a real, working
+  account), both emails are skipped entirely. Returns `alreadyRegistered` in the response so the
+  three detail-page invite UIs (Admin Provider, Provider Client, Provider Worker) show an accurate
+  "already has an account, just linked — no email sent" message instead of a misleading
+  "Invitation sent"
+
 ## Session 48 — 31 July 2026
 
 ### Fix the Real Cause of "This Password Reset Link Is Invalid or Has Expired"

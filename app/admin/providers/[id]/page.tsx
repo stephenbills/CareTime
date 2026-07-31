@@ -63,7 +63,10 @@ export default function ProviderFormPage() {
         .from('providers').select('user_id').eq('id', id).single()
       if (updated?.user_id) setUserId(updated.user_id)
 
-      if (result.passwordEmailSent === false) {
+      if (result.alreadyRegistered) {
+        setInviteMsg('This person already has a CareTime account and is now linked — no email was sent since they can already log in.')
+        setTimeout(() => setInviteMsg(''), 6000)
+      } else if (result.passwordEmailSent === false) {
         setError('Account created, but the password-setup email failed to send (a network issue reaching the email provider). Please try Resend Invite again in a moment.')
       } else {
         setInviteMsg(`Invitation sent to ${data.email.trim()}`)

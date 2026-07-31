@@ -83,10 +83,18 @@ export async function POST(req: NextRequest) {
     )
 
     let userId: string
+    // An existing account that has never actually signed in is still sitting on
+    // the random temp password nobody knows — it genuinely needs a password-setup
+    // email, same as a brand-new user. But an existing account that HAS signed in
+    // before (e.g. this Client/Worker already has a working login via a different
+    // Provider) already has real credentials — sending them another "Set Your
+    // Password" + welcome email is confusing noise, not a real invite.
+    let needsPasswordSetup = true
 
     if (existing) {
-      console.log('[/api/invite] User already exists:', existing.id)
+      console.log('[/api/invite] User already exists:', existing.id, 'last_sign_in_at:', existing.last_sign_in_at)
       userId = existing.id
+      needsPasswordSetup = !existing.last_sign_in_at
     } else {
       // Create the user directly with a temporary password
       // then immediately send a password reset so they can set their own
@@ -109,13 +117,17 @@ export async function POST(req: NextRequest) {
       console.log('[/api/invite] Created user:', userId)
     }
 
-    // Always (re)generate and send a password-setup link — for a brand-new
-    // user this is how they get in at all; for an existing user this is what
-    // makes "Resend Invite" actually do something useful when the original
-    // send failed (e.g. a transient network error to Brevo), rather than
-    // silently falling through to just the generic welcome email below.
+    // (Re)generate and send a password-setup link — for a brand-new user, or an
+    // existing-but-never-signed-in one, this is how they get in at all (and is
+    // what makes "Resend Invite" actually do something useful when the original
+    // send failed). Skipped entirely for an already-active existing account —
+    // see needsPasswordSetup above.
     let passwordEmailSent = false
     const resetUrl = `${APP_URL}/auth/reset-password`
+
+    if (!needsPasswordSetup) {
+      console.log('[/api/invite] Existing, already-active account — skipping password-setup email')
+    } else {
     const { data: linkData, error: resetError } = await admin.auth.admin.generateLink({
       type: 'recovery',
       email,
@@ -178,6 +190,7 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+    }
 
     // Link the auth user_id back to the app table record
     const { error: updateError } = await admin
@@ -191,21 +204,27 @@ export async function POST(req: NextRequest) {
       console.log('[/api/invite] Linked user_id to', table)
     }
 
-    // Always send a Brevo welcome email with login instructions
-    const { subject, html } = welcomeEmail({
-      name: name || email,
-      role: ROLE_ROUTE[role] || role,
-      loginUrl: `${APP_URL}/auth/login`,
-    })
+    // Welcome email — also skipped for an already-active existing account; its
+    // "get started" copy assumes this is someone's first time on CareTime, which
+    // isn't true for someone who already has a working login elsewhere.
+    if (needsPasswordSetup) {
+      const { subject, html } = welcomeEmail({
+        name: name || email,
+        role: ROLE_ROUTE[role] || role,
+        loginUrl: `${APP_URL}/auth/login`,
+      })
 
-    try {
-      await sendEmail({ to: email, subject, html })
-      console.log('[/api/invite] Brevo welcome email sent to', email)
-    } catch (emailErr: any) {
-      console.warn('[/api/invite] Brevo email failed:', emailErr.message)
+      try {
+        await sendEmail({ to: email, subject, html })
+        console.log('[/api/invite] Brevo welcome email sent to', email)
+      } catch (emailErr: any) {
+        console.warn('[/api/invite] Brevo email failed:', emailErr.message)
+      }
+    } else {
+      console.log('[/api/invite] Existing, already-active account — skipping welcome email')
     }
 
-    return NextResponse.json({ success: true, userId, passwordEmailSent })
+    return NextResponse.json({ success: true, userId, passwordEmailSent, alreadyRegistered: !needsPasswordSetup })
 
   } catch (err: any) {
     console.error('[/api/invite] Unexpected error:', err.message)
