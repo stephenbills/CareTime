@@ -115,11 +115,16 @@ export default function ClientDetailPage() {
     if (!res.ok) {
       setError(result.error || 'Failed to send invitation')
     } else {
-      setInviteMsg(`Invitation sent to ${client.email}`)
       const { data: updated } = await supabase
         .from('clients').select('user_id').eq('id', id).single()
       if (updated?.user_id) setClient((c: any) => ({ ...c, user_id: updated.user_id }))
-      setTimeout(() => setInviteMsg(''), 4000)
+
+      if (result.passwordEmailSent === false) {
+        setError('Account created, but the password-setup email failed to send (a network issue reaching the email provider). Please try Resend Invite again in a moment.')
+      } else {
+        setInviteMsg(`Invitation sent to ${client.email}`)
+        setTimeout(() => setInviteMsg(''), 4000)
+      }
     }
     setInviting(false)
   }

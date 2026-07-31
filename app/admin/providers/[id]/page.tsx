@@ -59,11 +59,16 @@ export default function ProviderFormPage() {
     if (!res.ok) {
       setError(result.error || 'Failed to send invitation')
     } else {
-      setInviteMsg(`Invitation sent to ${data.email.trim()}`)
       const { data: updated } = await supabase
         .from('providers').select('user_id').eq('id', id).single()
       if (updated?.user_id) setUserId(updated.user_id)
-      setTimeout(() => setInviteMsg(''), 4000)
+
+      if (result.passwordEmailSent === false) {
+        setError('Account created, but the password-setup email failed to send (a network issue reaching the email provider). Please try Resend Invite again in a moment.')
+      } else {
+        setInviteMsg(`Invitation sent to ${data.email.trim()}`)
+        setTimeout(() => setInviteMsg(''), 4000)
+      }
     }
     setInviting(false)
   }

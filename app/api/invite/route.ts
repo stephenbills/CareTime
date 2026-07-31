@@ -107,28 +107,34 @@ export async function POST(req: NextRequest) {
 
       userId = created.user.id
       console.log('[/api/invite] Created user:', userId)
+    }
 
-      // Generate a password reset link and send via Brevo API directly
-      const resetUrl = `${APP_URL}/auth/reset-password`
-      const { data: linkData, error: resetError } = await admin.auth.admin.generateLink({
-        type: 'recovery',
-        email,
-        options: { redirectTo: resetUrl },
-      })
+    // Always (re)generate and send a password-setup link — for a brand-new
+    // user this is how they get in at all; for an existing user this is what
+    // makes "Resend Invite" actually do something useful when the original
+    // send failed (e.g. a transient network error to Brevo), rather than
+    // silently falling through to just the generic welcome email below.
+    let passwordEmailSent = false
+    const resetUrl = `${APP_URL}/auth/reset-password`
+    const { data: linkData, error: resetError } = await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo: resetUrl },
+    })
 
-      if (resetError) {
-        console.warn('[/api/invite] generateLink error:', resetError.message)
-      } else {
-        const resetLink = linkData?.properties?.action_link
-        if (resetLink) {
-          // Route through a click-gated interstitial instead of emailing the
-          // raw Supabase verify link directly — a corporate email scanner
-          // prefetching the link would otherwise consume the one-time token
-          // before the person ever clicks, making it look "expired" on the
-          // very first genuine click.
-          const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(resetLink)}`
-          // Send via Brevo API directly — bypasses Supabase SMTP
-          const resetHtml = `
+    if (resetError) {
+      console.warn('[/api/invite] generateLink error:', resetError.message)
+    } else {
+      const resetLink = linkData?.properties?.action_link
+      if (resetLink) {
+        // Route through a click-gated interstitial instead of emailing the
+        // raw Supabase verify link directly — a corporate email scanner
+        // prefetching the link would otherwise consume the one-time token
+        // before the person ever clicks, making it look "expired" on the
+        // very first genuine click.
+        const gatedLink = `${APP_URL}/auth/verify-link?to=${encodeURIComponent(resetLink)}`
+        // Send via Brevo API directly — bypasses Supabase SMTP
+        const resetHtml = `
 <!DOCTYPE html><html><head><meta charset="utf-8" /></head>
 <body style="margin:0;padding:0;background-color:#f9fafb;font-family:Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;padding:32px 16px;">
@@ -155,12 +161,12 @@ export async function POST(req: NextRequest) {
 </td></tr>
 </table>
 </body></html>`
-          try {
-            await sendEmail({ to: email, subject: 'Set your CareTime password', html: resetHtml })
-            console.log('[/api/invite] Password setup email sent via Brevo to', email)
-          } catch (emailErr: any) {
-            console.warn('[/api/invite] Brevo reset email failed:', emailErr.message)
-          }
+        try {
+          await sendEmail({ to: email, subject: 'Set your CareTime password', html: resetHtml })
+          console.log('[/api/invite] Password setup email sent via Brevo to', email)
+          passwordEmailSent = true
+        } catch (emailErr: any) {
+          console.warn('[/api/invite] Brevo reset email failed:', emailErr.message)
         }
       }
     }
@@ -191,7 +197,7 @@ export async function POST(req: NextRequest) {
       console.warn('[/api/invite] Brevo email failed:', emailErr.message)
     }
 
-    return NextResponse.json({ success: true, userId })
+    return NextResponse.json({ success: true, userId, passwordEmailSent })
 
   } catch (err: any) {
     console.error('[/api/invite] Unexpected error:', err.message)

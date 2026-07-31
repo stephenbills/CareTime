@@ -4,6 +4,26 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 47 — 31 July 2026
+
+### Fix Invite Email Reliability and Make Resend Invite Actually Work
+
+- Inviting a new Provider failed with a Brevo `ConnectTimeoutError` (a transient network issue
+  reaching Brevo's API from the Vercel function) — the password-setup email never sent, but the
+  route still returned success, so there was no visible failure
+- Found a real correctness bug while investigating: `/api/invite`'s "user already exists" branch
+  never (re)generated or sent a password-setup email at all — only new users got one. That meant
+  the Resend Invite feature added in Session 46 was non-functional for exactly the case it exists
+  to fix (an account created but never sent a working password link)
+- `app/api/invite/route.ts` now always (re)generates and sends the password-setup link regardless
+  of whether the auth user is new or pre-existing, and returns `passwordEmailSent` in its response
+- `lib/email/resend.ts`'s `sendEmail` now retries once on a network-level fetch failure (not on a
+  clean-but-bad API response, which would just fail identically again) — directly targets the
+  connect-timeout symptom
+- The three detail-page invite UIs (Admin Provider, Provider Client, Provider Worker) now show a
+  distinct warning when the account was created/linked but the password email still failed to
+  send, instead of a false "Invitation sent"
+
 ## Session 46 — 29 July 2026
 
 ### Resend Invitation on the Admin Provider Page

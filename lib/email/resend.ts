@@ -39,26 +39,37 @@ export async function sendEmail({
     }))
   }
 
-  try {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-
-    if (!res.ok) {
-      const error = await res.json()
-      console.error('Brevo send error:', error)
-      throw new Error(error.message || 'Failed to send email')
+  // Retry only the network-level fetch (e.g. the connect-timeout that prompted
+  // this) — not a clean-but-bad Brevo response like an invalid API key, which
+  // would just fail identically on every attempt.
+  const MAX_ATTEMPTS = 2
+  let res: Response | undefined
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': apiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+      break
+    } catch (err) {
+      lastErr = err
+      console.error(`Brevo fetch failed (attempt ${attempt}/${MAX_ATTEMPTS}):`, err)
+      if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 1000))
     }
-
-    return await res.json()
-  } catch (err) {
-    console.error('Failed to send email:', err)
-    throw err
   }
+  if (!res) throw lastErr
+
+  if (!res.ok) {
+    const error = await res.json()
+    console.error('Brevo send error:', error)
+    throw new Error(error.message || 'Failed to send email')
+  }
+
+  return await res.json()
 }
