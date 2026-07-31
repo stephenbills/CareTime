@@ -33,9 +33,15 @@ export default function NewCarerPage() {
     setSaving(true)
     setError('')
 
-    // Check if a worker with this email already exists
+    // Check if a worker with this email already exists — case-insensitive,
+    // since the same email can be stored with different casing depending on
+    // who originally entered it. A case-sensitive match here would silently
+    // create a duplicate worker record instead of linking to the real one.
+    // Escape % and _ (both valid email characters) so they're treated
+    // literally, not as ILIKE wildcards.
+    const escapedEmail = data.email.trim().replace(/[%_]/g, '\\$&')
     const { data: existing } = await supabase
-      .from('carers').select('id, name').eq('email', data.email.trim()).maybeSingle()
+      .from('carers').select('id, name').ilike('email', escapedEmail).maybeSingle()
 
     let workerId: string
 
@@ -66,7 +72,7 @@ export default function NewCarerPage() {
     } else {
       // Create new worker record
       const payload = {
-        name: data.name, email: data.email || null, mobile: data.mobile || null,
+        name: data.name, email: data.email ? data.email.trim().toLowerCase() : null, mobile: data.mobile || null,
         home_phone: data.home_phone || null, work_phone: data.work_phone || null,
         address_line1: data.address_line1 || null, suburb: data.suburb || null,
         state: data.state || null, postcode: data.postcode || null,

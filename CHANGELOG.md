@@ -4,6 +4,20 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 50 — 31 July 2026
+
+### Fix Case-Sensitive Email Lookup Creating Duplicate Clients/Workers
+
+- "Add Client"/"Add Worker"'s existing-by-email check (`app/provider/clients/new/page.tsx`,
+  `app/provider/carers/new/page.tsx`) used an exact, case-sensitive email match. If the stored
+  email's casing didn't match exactly what was typed, the lookup silently found nothing and fell
+  through to creating a **new, duplicate** client/worker record instead of linking to the real
+  one — leaving the actual person's account unlinked to the new Provider, with no error shown
+- Switched to a case-insensitive `ilike` match, escaping `%`/`_` first since both are valid email
+  characters that would otherwise act as ILIKE wildcards and risk matching the wrong person
+- New client/worker records now also store their email lowercased, so future lookups stay
+  consistent going forward
+
 ## Session 49 — 31 July 2026
 
 ### Don't Re-Invite Someone Who Already Has a Working Account

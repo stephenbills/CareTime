@@ -35,9 +35,15 @@ export default function NewClientPage() {
     const { data: provider } = await supabase
       .from('providers').select('id').eq('user_id', user!.id).single()
 
-    // Check if a client with this email already exists
+    // Check if a client with this email already exists — case-insensitive,
+    // since the same email can be stored with different casing depending on
+    // who originally entered it. A case-sensitive match here would silently
+    // create a duplicate client record instead of linking to the real one.
+    // Escape % and _ (both valid email characters) so they're treated
+    // literally, not as ILIKE wildcards.
+    const escapedEmail = data.email.trim().replace(/[%_]/g, '\\$&')
     const { data: existing } = await supabase
-      .from('clients').select('id, name').eq('email', data.email.trim()).maybeSingle()
+      .from('clients').select('id, name').ilike('email', escapedEmail).maybeSingle()
 
     let clientId: string
 
@@ -69,7 +75,7 @@ export default function NewClientPage() {
     } else {
       // Create new client record
       const payload = {
-        name: data.name, email: data.email || null, phone: data.phone || null,
+        name: data.name, email: data.email ? data.email.trim().toLowerCase() : null, phone: data.phone || null,
         mobile: data.mobile || null, address_line1: data.address_line1 || null,
         address_line2: data.address_line2 || null, suburb: data.suburb || null,
         state: data.state || null, postcode: data.postcode || null,
