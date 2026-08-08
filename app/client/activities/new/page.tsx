@@ -227,6 +227,7 @@ function ClientNewActivityInner() {
 
       if (created) {
         const occurrences = generateOccurrences(rruleStr!, startDate, startTimeVal, durationMin)
+        let firstActivityId: string | undefined
         if (occurrences.length > 0) {
           const { data: createdActivities, error: occErr } = await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
             recurring_schedule_id: created.id,
@@ -251,22 +252,28 @@ function ClientNewActivityInner() {
             })))
             await supabase.from('activity_medical_instructions').insert(rows)
           }
+          firstActivityId = createdActivities?.[0]?.id
         }
         // Ask the nominated Worker to accept/decline; if none was chosen,
         // ask the Provider to review and either assign a Worker or reject it.
-        const firstStart = buildDateTime(startDate, startTimeVal)
-        const firstEnd = new Date(firstStart.getTime() + durationMin * 60000)
-        const emailFields = {
-          activityTitle: `${title.trim()} (recurring schedule)`,
-          clientName: clientName || '—',
-          startTime: formatDateTime(firstStart.toISOString()),
-          endTime: formatDateTime(firstEnd.toISOString()),
-          activityId: created.id,
-        }
-        if (selectedCarer?.email) {
-          notify('activity_assigned', selectedCarer.email, { ...emailFields, carerName: selectedCarer.name })
-        } else if (providerEmail) {
-          notify('activity_assigned', providerEmail, { ...emailFields, carerName: providerName || 'Provider', role: 'provider' })
+        // The notification must be tied to a real activities row — not the
+        // recurring_schedules row, which /api/notify's authorization check
+        // wouldn't find and would silently 403 — so skip it if none exist.
+        if (firstActivityId) {
+          const firstStart = buildDateTime(startDate, startTimeVal)
+          const firstEnd = new Date(firstStart.getTime() + durationMin * 60000)
+          const emailFields = {
+            activityTitle: `${title.trim()} (recurring schedule)`,
+            clientName: clientName || '—',
+            startTime: formatDateTime(firstStart.toISOString()),
+            endTime: formatDateTime(firstEnd.toISOString()),
+            activityId: firstActivityId,
+          }
+          if (selectedCarer?.email) {
+            notify('activity_assigned', selectedCarer.email, { ...emailFields, carerName: selectedCarer.name })
+          } else if (providerEmail) {
+            notify('activity_assigned', providerEmail, { ...emailFields, carerName: providerName || 'Provider', role: 'provider' })
+          }
         }
       }
     } else {

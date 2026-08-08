@@ -280,8 +280,9 @@ export default function ActivityPage() {
 
       if (created) {
         const occurrences = generateOccurrences(rruleStr, data.start_time, durationMin)
+        let firstActivityId: string | undefined
         if (occurrences.length > 0) {
-          const { error: occErr } = await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
+          const { data: createdActivities, error: occErr } = await supabase.from('activities').insert(occurrences.map(({ start, end }) => ({
             recurring_schedule_id: created.id,
             provider_id: provider?.id || null,
             client_id: data.client_id || null,
@@ -295,18 +296,22 @@ export default function ActivityPage() {
             pickup_address: data.pickup_address || null,
             dropoff_address: data.dropoff_address || null,
             venue_address: data.venue_address || null,
-          })))
+          }))).select('id')
           if (occErr) { setError(`Schedule created, but failed to generate shifts: ${occErr.message}`); setSaving(false); return }
+          firstActivityId = createdActivities?.[0]?.id
         }
 
-        if (selectedCarer?.email) {
+        // Notification must be tied to a real activities row — not the
+        // recurring_schedules row, which /api/notify's authorization check
+        // wouldn't find and would silently 403.
+        if (selectedCarer?.email && firstActivityId) {
           notify('activity_assigned', selectedCarer.email, {
             carerName: selectedCarer.name,
             activityTitle: `${data.title} (recurring schedule)`,
             clientName: selectedClient?.name || '—',
             startTime: formatDateTime(data.start_time),
             endTime: formatDateTime(data.end_time),
-            activityId: created.id,
+            activityId: firstActivityId,
           })
         }
 

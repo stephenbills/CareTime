@@ -4,6 +4,22 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 53 — 08 August 2026
+
+### Fix Silent 403 on Accept/Reject Emails for Recurring Activities
+
+- The Session 52 accept/reject notification (and the pre-existing Worker-assignment email on the
+  Provider side) silently failed for **recurring** activities: `activityId` was set to the newly
+  created `recurring_schedules` row's id instead of one of the actual `activities` rows it
+  generated. `/api/notify`'s authorization check looks the id up in `activities`, finds nothing,
+  and returns 403 — with the failure only visible in Vercel function logs, not to the user
+- Fixed in `app/client/activities/new/page.tsx`, `app/provider/activities/new/page.tsx`, and
+  `app/provider/activities/[id]/page.tsx`: the recurring branch now captures the real id of the
+  first generated occurrence (`.select('id')` on the activities insert) and uses that instead;
+  if no occurrences were generated, the notification is skipped rather than sent with a bad id
+- This was a pre-existing bug on the Provider side too — assigning a Worker to a brand-new
+  recurring schedule never actually emailed them, it just failed silently
+
 ## Session 52 — 08 August 2026
 
 ### Notify Worker (or Provider) to Accept/Reject When a Client Creates an Activity
