@@ -4,6 +4,31 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 51 — 08 August 2026
+
+### Fix Recurring Shifts Landing on the Wrong Weekday + Add Save-Scope Prompt to Client Edit Activity
+
+- Recurring shifts set to repeat on a given weekday (e.g. "every Monday") could generate on a
+  different day (e.g. Tuesday), inconsistently. Root cause: the `rrule` library works in
+  "floating time" — it reads a `Date`'s UTC calendar fields and treats them as the intended
+  wall-clock date — but CareTime built every recurrence anchor date via local-time parsing
+  (`new Date('2026-08-10T00:00:00')`-style). In Australia (UTC+10/+11) that makes the UTC fields
+  drift from the intended date by the timezone offset, shifting which weekday `rrule` matches.
+  Compounding it, `components/RecurrencePicker.tsx` never set `dtstart` on the rule it built, so
+  the serialized rrule string carried no `DTSTART` — every later re-parse (`RRule.fromString()`)
+  silently re-anchored to whatever moment happened to call it, making the shift intermittent
+- Added `lib/schedules/rruleDates.ts`, a small set of helpers that build/read dates the way
+  `rrule` expects (UTC-anchored), and applied them consistently everywhere the app touches
+  `rrule`: `RecurrencePicker.tsx` (now sets `dtstart`), `lib/schedules/ensureGenerated.ts`,
+  `app/client/activities/new/page.tsx`, `app/client/activities/[id]/page.tsx`,
+  `app/provider/schedules/page.tsx`, `app/provider/schedules/[id]/page.tsx`,
+  `app/provider/activities/new/page.tsx`, and `app/provider/activities/[id]/page.tsx`
+- Client "Edit Activity" no longer silently cascades an edit on a recurring activity to every
+  not-yet-completed occurrence. Saving now prompts for scope — "This event" (only this
+  occurrence), "This and following events" (this and every not-yet-completed occurrence from
+  this date onward), or "All events" (the previous, unscoped behaviour) — mirroring the existing
+  2-way Delete prompt
+
 ## Session 50 — 31 July 2026
 
 ### Fix Case-Sensitive Email Lookup Creating Duplicate Clients/Workers

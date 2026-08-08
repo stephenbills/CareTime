@@ -5,6 +5,7 @@ import { Plus, ChevronRight, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-r
 import Link from 'next/link'
 import { RRule } from 'rrule'
 import { useProviderId } from '@/lib/hooks/useProvider'
+import { dateOnlyToRRuleDate, localDateToRRuleDate, addDaysUTC, combineRRuleDateWithLocalTime } from '@/lib/schedules/rruleDates'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -67,13 +68,17 @@ export default function SchedulesPage() {
     let dates: Date[] = []
 
     if (schedule.rrule) {
-      // Use rrule to generate occurrences
+      // Use rrule to generate occurrences — rrule works in "floating time"
+      // (UTC-anchored) so its anchors must be built separately from the real
+      // local `today`/`until` above, then converted back on the way out.
       const rule = RRule.fromString(schedule.rrule)
-      const validUntil = schedule.valid_until ? new Date(schedule.valid_until) : until
-      const endDate = validUntil < until ? validUntil : until
-      const validFrom = schedule.valid_from ? new Date(schedule.valid_from) : today
-      const startDate = today > validFrom ? today : validFrom
-      dates = rule.between(startDate, endDate, true)
+      const todayRRule = localDateToRRuleDate(today)
+      const untilRRule = addDaysUTC(todayRRule, 28)
+      const validUntil = schedule.valid_until ? dateOnlyToRRuleDate(schedule.valid_until) : untilRRule
+      const endDate = validUntil < untilRRule ? validUntil : untilRRule
+      const validFrom = schedule.valid_from ? dateOnlyToRRuleDate(schedule.valid_from) : todayRRule
+      const startDate = todayRRule > validFrom ? todayRRule : validFrom
+      dates = rule.between(startDate, endDate, true).map(occ => combineRRuleDateWithLocalTime(occ, 0, 0))
     } else if (schedule.days_of_week) {
       // Legacy: use days_of_week array
       const validFrom = schedule.valid_from ? new Date(schedule.valid_from) : today

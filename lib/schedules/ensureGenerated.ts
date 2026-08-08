@@ -1,5 +1,6 @@
 import { RRule } from 'rrule'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { dateOnlyToRRuleDate, localDateToRRuleDate, addDaysUTC, rruleDateToLocalDateStr, combineRRuleDateWithLocalTime } from './rruleDates'
 
 const WINDOW_DAYS = 28 // 4 weeks
 
@@ -28,8 +29,11 @@ export async function ensureSchedulesGenerated(supabase: SupabaseClient, provide
     const scheduleIds = schedules.map(s => s.id)
     const now = new Date()
     now.setHours(0, 0, 0, 0)
-    const windowEnd = new Date(now)
-    windowEnd.setDate(windowEnd.getDate() + WINDOW_DAYS)
+    // Separate "rrule space" anchors (UTC-anchored, per rrule's floating-time
+    // convention) from `now`/`furthest` above, which stay real local instants
+    // for comparing against genuine stored timestamps.
+    const nowRRule = localDateToRRuleDate(new Date())
+    const windowEnd = addDaysUTC(nowRRule, WINDOW_DAYS)
 
     const { data: futureActivities } = await supabase
       .from('activities')
@@ -49,13 +53,14 @@ export async function ensureSchedulesGenerated(supabase: SupabaseClient, provide
         return !max || d > max ? d : max
       }, null)
 
-      const validFromDate = schedule.valid_from ? new Date(`${schedule.valid_from}T00:00:00`) : now
-      const searchStart = furthest && furthest > now ? furthest : (validFromDate > now ? validFromDate : now)
+      const validFromDate = schedule.valid_from ? dateOnlyToRRuleDate(schedule.valid_from) : nowRRule
+      const furthestRRule = furthest ? localDateToRRuleDate(furthest) : null
+      const searchStart = furthestRRule && furthestRRule > nowRRule ? furthestRRule : (validFromDate > nowRRule ? validFromDate : nowRRule)
 
       if (searchStart >= windowEnd) continue // already generated far enough ahead
 
-      const until = schedule.valid_until && new Date(schedule.valid_until) < windowEnd
-        ? new Date(schedule.valid_until)
+      const until = schedule.valid_until && dateOnlyToRRuleDate(schedule.valid_until) < windowEnd
+        ? dateOnlyToRRuleDate(schedule.valid_until)
         : windowEnd
 
       const rule = RRule.fromString(schedule.rrule)
@@ -67,9 +72,9 @@ export async function ensureSchedulesGenerated(supabase: SupabaseClient, provide
       const durationMins = schedule.duration_minutes || 120
 
       const newRows = occurrences
-        .filter(occ => !existingDates.has(localDateStr(occ)))
+        .filter(occ => !existingDates.has(rruleDateToLocalDateStr(occ)))
         .map(occ => {
-          const start = new Date(occ); start.setHours(sh, sm, 0, 0)
+          const start = combineRRuleDateWithLocalTime(occ, sh, sm)
           const end = new Date(start); end.setMinutes(end.getMinutes() + durationMins)
           return {
             recurring_schedule_id: schedule.id,

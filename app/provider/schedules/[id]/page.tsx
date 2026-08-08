@@ -7,6 +7,7 @@ import Link from 'next/link'
 import RecurrencePicker from '@/components/RecurrencePicker'
 import { useProviderId } from '@/lib/hooks/useProvider'
 import { RRule } from 'rrule'
+import { dateOnlyToRRuleDate, localDateToRRuleDate, addDaysUTC, rruleDateToLocalDateStr, combineRRuleDateWithLocalTime } from '@/lib/schedules/rruleDates'
 
 const DURATIONS = [
   { label: '30 min', value: 30 }, { label: '1 hour', value: 60 },
@@ -226,15 +227,15 @@ export default function ScheduleFormPage() {
       // are never deleted here.
       if (rruleStr && rruleStr !== initialRRule) {
         const rule = RRule.fromString(rruleStr)
-        const now = new Date(); now.setHours(0, 0, 0, 0)
-        const chosenStart = new Date(`${validFrom}T00:00:00`)
+        const now = localDateToRRuleDate(new Date())
+        const chosenStart = dateOnlyToRRuleDate(validFrom)
         const searchStart = now > chosenStart ? now : chosenStart
-        const until = new Date(searchStart); until.setDate(until.getDate() + 28)
+        const until = addDaysUTC(searchStart, 28)
         const occurrences = rule.between(searchStart, until, true)
         const newRows = occurrences
-          .filter(occ => !existingDates.has(localDateStr(occ)))
+          .filter(occ => !existingDates.has(rruleDateToLocalDateStr(occ)))
           .map(occ => {
-            const start = new Date(occ); start.setHours(sh, sm, 0, 0)
+            const start = combineRRuleDateWithLocalTime(occ, sh, sm)
             const end = new Date(start); end.setMinutes(end.getMinutes() + durationMins)
             return {
               recurring_schedule_id: id,

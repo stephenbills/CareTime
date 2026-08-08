@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { notify } from '@/lib/email/notify'
 import RecurrencePicker from '@/components/RecurrencePicker'
 import { RRule } from 'rrule'
+import { localDateToRRuleDate, addDaysUTC, rruleDateToLocalDateStr, combineRRuleDateWithLocalTime } from '@/lib/schedules/rruleDates'
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-AU', {
@@ -66,6 +67,7 @@ export default function ClientActivityPage() {
   const [schedule, setSchedule] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showSaveScopeModal, setShowSaveScopeModal] = useState(false)
   const [medicalInstructions, setMedicalInstructions] = useState<any[]>([])
   const [attachedInstructions, setAttachedInstructions] = useState<any[]>([])
   const [selectedInstructionIds, setSelectedInstructionIds] = useState<Set<string>>(new Set())
@@ -245,115 +247,147 @@ export default function ClientActivityPage() {
 
   async function handleSaveEdit() {
     if (!editData.title.trim()) { setError('Title is required'); return }
-    setActing(true); setError('')
-
     if (activity.recurring_schedule_id && schedule) {
-      // Recurring activity — cascade title/description/time-of-day changes to
-      // every not-yet-completed occurrence in the series (each keeps its own
-      // date), and allow editing the recurrence pattern itself.
-      const durationMin = shiftDurationMinutes(editStartTime, editEndTime)
-      const rruleChanged = editRrule !== schedule.rrule
+      setShowSaveScopeModal(true)
+      return
+    }
+    setActing(true); setError('')
+    const { error: err } = await supabase.from('activities').update({
+      title: editData.title.trim(),
+      description: editData.description || null,
+      start_time: editData.start_time ? new Date(editData.start_time).toISOString() : undefined,
+      end_time: editData.end_time ? new Date(editData.end_time).toISOString() : undefined,
+    }).eq('id', id)
+    if (err) { setError(err.message); setActing(false); return }
+    await finishSaveEdit()
+  }
 
-      let daysOfWeek: number[] | null = null
-      if (editRrule) {
-        try {
-          const rule = RRule.fromString(editRrule)
-          const byDay = rule.origOptions.byweekday
-          if (byDay) {
-            daysOfWeek = (byDay as any[]).map((d: any) => {
-              const wd = typeof d === 'number' ? d : (d.weekday ?? d)
-              return (wd + 1) % 7
-            })
-          }
-        } catch {}
-      }
+  // Recurring activity save, scoped per the modal choice — mirrors the
+  // existing 2-way delete-scope pattern (doDelete), extended to 3 ways since
+  // an edit (unlike a delete) can also mean "start a new pattern from here."
+  async function doSaveEdit(scope: 'this' | 'following' | 'all') {
+    setShowSaveScopeModal(false)
+    setActing(true); setError('')
+    const durationMin = shiftDurationMinutes(editStartTime, editEndTime)
+    const [sh, sm] = editStartTime.split(':').map(Number)
 
-      const { error: schedErr } = await supabase.from('recurring_schedules').update({
-        title: editData.title.trim(),
-        description: editData.description || null,
-        rrule: editRrule,
-        days_of_week: daysOfWeek,
-        start_time: editStartTime,
-        duration_minutes: durationMin,
-      }).eq('id', activity.recurring_schedule_id)
-      if (schedErr) { setError(schedErr.message); setActing(false); return }
-
-      const { data: siblings, error: fetchErr } = await supabase
-        .from('activities').select('id, start_time')
-        .eq('recurring_schedule_id', activity.recurring_schedule_id)
-        .in('status', ['awaiting_acceptance', 'scheduled'])
-      if (fetchErr) { setError(fetchErr.message); setActing(false); return }
-
-      const [sh, sm] = editStartTime.split(':').map(Number)
-      const existingDates = new Set<string>()
-      for (const sib of siblings || []) {
-        const d = new Date(sib.start_time)
-        existingDates.add(localDateStr(d))
-        const start = new Date(d); start.setHours(sh, sm, 0, 0)
-        const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
-        const { error: patchErr } = await supabase.from('activities').update({
-          title: editData.title.trim(),
-          description: editData.description || null,
-          start_time: start.toISOString(),
-          end_time: end.toISOString(),
-        }).eq('id', sib.id)
-        if (patchErr) { setError(patchErr.message); setActing(false); return }
-      }
-
-      // If the pattern changed, add any newly-implied future occurrences that
-      // don't already exist — existing occurrences are never deleted here, so
-      // switching patterns only adds shifts, it never silently removes
-      // confirmed ones (use the existing delete flow for that).
-      if (rruleChanged && editRrule) {
-        const rule = RRule.fromString(editRrule)
-        const now = new Date(); now.setHours(0, 0, 0, 0)
-        const until = new Date(now); until.setDate(until.getDate() + 28)
-        const occurrences = rule.between(now, until, true)
-        const newRows = occurrences
-          .filter(occ => !existingDates.has(localDateStr(occ)))
-          .map(occ => {
-            const start = new Date(occ); start.setHours(sh, sm, 0, 0)
-            const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
-            return {
-              recurring_schedule_id: activity.recurring_schedule_id,
-              provider_id: schedule.provider_id,
-              client_id: schedule.client_id,
-              carer_id: schedule.carer_id || null,
-              ndis_line_item_id: schedule.ndis_line_item_id || null,
-              title: editData.title.trim(),
-              description: editData.description || null,
-              status: 'awaiting_acceptance',
-              start_time: start.toISOString(),
-              end_time: end.toISOString(),
-              pickup_address: schedule.pickup_address || null,
-              dropoff_address: schedule.dropoff_address || null,
-              venue_address: schedule.venue_address || null,
-            }
-          })
-        if (newRows.length > 0) {
-          const { error: insErr } = await supabase.from('activities').insert(newRows)
-          if (insErr) { setError(insErr.message); setActing(false); return }
-        }
-      }
-    } else {
+    if (scope === 'this') {
+      // A single occurrence can't carry its own recurrence pattern, so the
+      // schedule row and sibling rows are left untouched — only this row's
+      // title/description/time change, keeping its own date.
+      const start = new Date(activity.start_time); start.setHours(sh, sm, 0, 0)
+      const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
       const { error: err } = await supabase.from('activities').update({
         title: editData.title.trim(),
         description: editData.description || null,
-        start_time: editData.start_time ? new Date(editData.start_time).toISOString() : undefined,
-        end_time: editData.end_time ? new Date(editData.end_time).toISOString() : undefined,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
       }).eq('id', id)
       if (err) { setError(err.message); setActing(false); return }
+      await finishSaveEdit()
+      return
     }
 
-    // Medical Instructions are per-occurrence only — never cascaded to siblings,
-    // unlike title/description/time-of-day above.
+    // 'following' or 'all' — cascade title/description/time-of-day changes
+    // to not-yet-completed siblings (restricted to this date onward for
+    // 'following'), and allow editing the recurrence pattern itself.
+    const rruleChanged = editRrule !== schedule.rrule
+
+    let daysOfWeek: number[] | null = null
+    if (editRrule) {
+      try {
+        const rule = RRule.fromString(editRrule)
+        const byDay = rule.origOptions.byweekday
+        if (byDay) {
+          daysOfWeek = (byDay as any[]).map((d: any) => {
+            const wd = typeof d === 'number' ? d : (d.weekday ?? d)
+            return (wd + 1) % 7
+          })
+        }
+      } catch {}
+    }
+
+    const { error: schedErr } = await supabase.from('recurring_schedules').update({
+      title: editData.title.trim(),
+      description: editData.description || null,
+      rrule: editRrule,
+      days_of_week: daysOfWeek,
+      start_time: editStartTime,
+      duration_minutes: durationMin,
+    }).eq('id', activity.recurring_schedule_id)
+    if (schedErr) { setError(schedErr.message); setActing(false); return }
+
+    let siblingQuery = supabase
+      .from('activities').select('id, start_time')
+      .eq('recurring_schedule_id', activity.recurring_schedule_id)
+      .in('status', ['awaiting_acceptance', 'scheduled'])
+    if (scope === 'following') siblingQuery = siblingQuery.gte('start_time', activity.start_time)
+    const { data: siblings, error: fetchErr } = await siblingQuery
+    if (fetchErr) { setError(fetchErr.message); setActing(false); return }
+
+    const existingDates = new Set<string>()
+    for (const sib of siblings || []) {
+      const d = new Date(sib.start_time)
+      existingDates.add(localDateStr(d))
+      const start = new Date(d); start.setHours(sh, sm, 0, 0)
+      const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
+      const { error: patchErr } = await supabase.from('activities').update({
+        title: editData.title.trim(),
+        description: editData.description || null,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+      }).eq('id', sib.id)
+      if (patchErr) { setError(patchErr.message); setActing(false); return }
+    }
+
+    // If the pattern changed, add any newly-implied future occurrences that
+    // don't already exist — existing occurrences are never deleted here, so
+    // switching patterns only adds shifts, it never silently removes
+    // confirmed ones (use the existing delete flow for that).
+    if (rruleChanged && editRrule) {
+      const rule = RRule.fromString(editRrule)
+      const now = localDateToRRuleDate(new Date())
+      const until = addDaysUTC(now, 28)
+      const occurrences = rule.between(now, until, true)
+      const newRows = occurrences
+        .filter(occ => !existingDates.has(rruleDateToLocalDateStr(occ)))
+        .map(occ => {
+          const start = combineRRuleDateWithLocalTime(occ, sh, sm)
+          const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
+          return {
+            recurring_schedule_id: activity.recurring_schedule_id,
+            provider_id: schedule.provider_id,
+            client_id: schedule.client_id,
+            carer_id: schedule.carer_id || null,
+            ndis_line_item_id: schedule.ndis_line_item_id || null,
+            title: editData.title.trim(),
+            description: editData.description || null,
+            status: 'awaiting_acceptance',
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            pickup_address: schedule.pickup_address || null,
+            dropoff_address: schedule.dropoff_address || null,
+            venue_address: schedule.venue_address || null,
+          }
+        })
+      if (newRows.length > 0) {
+        const { error: insErr } = await supabase.from('activities').insert(newRows)
+        if (insErr) { setError(insErr.message); setActing(false); return }
+      }
+    }
+
+    await finishSaveEdit()
+  }
+
+  // Medical Instructions are per-occurrence only — never cascaded to
+  // siblings, regardless of save scope above.
+  async function finishSaveEdit() {
     await supabase.from('activity_medical_instructions').delete().eq('activity_id', id)
     if (selectedInstructionIds.size > 0) {
       await supabase.from('activity_medical_instructions').insert(
         Array.from(selectedInstructionIds).map(medical_instruction_id => ({ activity_id: id, medical_instruction_id }))
       )
     }
-
     setEditing(false)
     await load()
     setActing(false)
@@ -456,6 +490,41 @@ export default function ClientActivityPage() {
             </div>
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
               <button onClick={() => setShowDeleteModal(false)}
+                className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recurring save-scope modal */}
+      {showSaveScopeModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Save Changes</h2>
+              <p className="text-sm text-gray-500 mb-5">
+                This activity is part of a recurring schedule. What would you like to update?
+              </p>
+              <div className="space-y-2">
+                <button onClick={() => doSaveEdit('this')} disabled={acting}
+                  className="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                  <p className="font-semibold text-sm text-gray-900">This event</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Update only this occurrence</p>
+                </button>
+                <button onClick={() => doSaveEdit('following')} disabled={acting}
+                  className="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                  <p className="font-semibold text-sm text-gray-900">This and following events</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Update this and every upcoming occurrence from this date onward</p>
+                </button>
+                <button onClick={() => doSaveEdit('all')} disabled={acting}
+                  className="w-full text-left p-3 rounded-xl border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50">
+                  <p className="font-semibold text-sm text-blue-700">All events</p>
+                  <p className="text-xs text-blue-500 mt-0.5">Update every occurrence in this series</p>
+                </button>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <button onClick={() => setShowSaveScopeModal(false)}
                 className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
             </div>
           </div>

@@ -9,6 +9,7 @@ import RecurrencePicker from '@/components/RecurrencePicker'
 import SearchableSelect from '@/components/SearchableSelect'
 import { RRule } from 'rrule'
 import { Suspense } from 'react'
+import { dateOnlyToRRuleDate, localDateToRRuleDate, addDaysUTC, combineRRuleDateWithLocalTime } from '@/lib/schedules/rruleDates'
 
 // Generate time options in 15-min increments
 function timeOptions() {
@@ -155,14 +156,14 @@ function ClientNewActivityInner() {
     // Anchor the search window to the chosen start date, not "today" — otherwise a
     // future start date gets skipped in favour of this week's matching weekday,
     // or (if the start date is more than 4 weeks out) no occurrences are found at all.
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const chosenStart = new Date(`${startDateStr}T00:00:00`)
+    const today = localDateToRRuleDate(new Date())
+    const chosenStart = dateOnlyToRRuleDate(startDateStr)
     const searchStart = today > chosenStart ? today : chosenStart
-    const until = new Date(searchStart); until.setDate(until.getDate() + 28)
+    const until = addDaysUTC(searchStart, 28)
     const occurrences = rule.between(searchStart, until, true)
     const [sh, sm] = startTimeStr.split(':').map(Number)
     return occurrences.map(occ => {
-      const start = new Date(occ); start.setHours(sh, sm, 0, 0)
+      const start = combineRRuleDateWithLocalTime(occ, sh, sm)
       const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
       return { start, end }
     })

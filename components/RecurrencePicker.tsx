@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { RRule } from 'rrule'
+import { localDateToRRuleDate } from '@/lib/schedules/rruleDates'
 
 const FREQ_OPTIONS = [
   { label: 'day', value: RRule.DAILY },
@@ -86,17 +87,18 @@ export default function RecurrencePicker({ startDate, onChange, initialRRule }: 
   }
 
   function buildRule(preset: PresetKey): { str: string | null; desc: string } {
+    const dtstart = localDateToRRuleDate(refDate)
     let rule: RRule | null = null
     switch (preset) {
       case 'none': return { str: null, desc: 'Does not repeat' }
-      case 'daily': rule = new RRule({ freq: RRule.DAILY, interval: 1 }); break
-      case 'weekly': rule = new RRule({ freq: RRule.WEEKLY, interval: 1, byweekday: [RRULE_DAYS[dayOfWeek]] }); break
-      case 'monthly_date': rule = new RRule({ freq: RRule.MONTHLY, interval: 1, bymonthday: [dateNum] }); break
-      case 'monthly_day': rule = new RRule({ freq: RRule.MONTHLY, interval: 1, byweekday: [RRULE_DAYS[dayOfWeek].nth(weekNum)] }); break
-      case 'yearly': rule = new RRule({ freq: RRule.YEARLY, interval: 1, bymonth: [refDate.getMonth() + 1], bymonthday: [dateNum] }); break
-      case 'weekdays': rule = new RRule({ freq: RRule.WEEKLY, interval: 1, byweekday: [RRule.MO, RRule.TU, RRule.WE, RRule.TH, RRule.FR] }); break
+      case 'daily': rule = new RRule({ freq: RRule.DAILY, interval: 1, dtstart }); break
+      case 'weekly': rule = new RRule({ freq: RRule.WEEKLY, interval: 1, byweekday: [RRULE_DAYS[dayOfWeek]], dtstart }); break
+      case 'monthly_date': rule = new RRule({ freq: RRule.MONTHLY, interval: 1, bymonthday: [dateNum], dtstart }); break
+      case 'monthly_day': rule = new RRule({ freq: RRule.MONTHLY, interval: 1, byweekday: [RRULE_DAYS[dayOfWeek].nth(weekNum)], dtstart }); break
+      case 'yearly': rule = new RRule({ freq: RRule.YEARLY, interval: 1, bymonth: [refDate.getMonth() + 1], bymonthday: [dateNum], dtstart }); break
+      case 'weekdays': rule = new RRule({ freq: RRule.WEEKLY, interval: 1, byweekday: [RRule.MO, RRule.TU, RRule.WE, RRule.TH, RRule.FR], dtstart }); break
       case 'custom': {
-        const opts: any = { freq, interval }
+        const opts: any = { freq, interval, dtstart }
         if (freq === RRule.WEEKLY && byDay.length > 0) opts.byweekday = byDay.map(d => RRULE_DAYS[d])
         if (endType === 'until' && untilDate) opts.until = new Date(untilDate + 'T23:59:59')
         else if (endType === 'count' && count > 0) opts.count = count

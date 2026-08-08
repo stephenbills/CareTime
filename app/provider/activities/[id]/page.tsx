@@ -9,6 +9,7 @@ import { notify } from '@/lib/email/notify'
 import { useProviderId } from '@/lib/hooks/useProvider'
 import RecurrencePicker from '@/components/RecurrencePicker'
 import { RRule } from 'rrule'
+import { localDateToRRuleDate, addDaysUTC, combineRRuleDateWithLocalTime } from '@/lib/schedules/rruleDates'
 
 const EMPTY = {
   title: '', description: '', status: 'awaiting_acceptance',
@@ -104,14 +105,14 @@ function generateOccurrences(rruleString: string, startDateTimeStr: string, dura
   // Anchor the search window to the chosen start date, not "today" — otherwise a
   // future start date gets skipped in favour of this week's matching weekday,
   // or (if the start date is more than 4 weeks out) no occurrences are found at all.
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const chosenStart = new Date(startDT); chosenStart.setHours(0, 0, 0, 0)
+  const today = localDateToRRuleDate(new Date())
+  const chosenStart = localDateToRRuleDate(startDT)
   const searchStart = today > chosenStart ? today : chosenStart
-  const until = new Date(searchStart); until.setDate(until.getDate() + 28)
+  const until = addDaysUTC(searchStart, 28)
   const occurrences = rule.between(searchStart, until, true)
   const sh = startDT.getHours(), sm = startDT.getMinutes()
   return occurrences.map(occ => {
-    const start = new Date(occ); start.setHours(sh, sm, 0, 0)
+    const start = combineRRuleDateWithLocalTime(occ, sh, sm)
     const end = new Date(start); end.setMinutes(end.getMinutes() + durationMin)
     return { start, end }
   })
