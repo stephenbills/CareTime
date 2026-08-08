@@ -81,20 +81,24 @@ function paragraph(text: string) {
 
 export function activityAssignedEmail(opts: {
   carerName: string; activityTitle: string; clientName: string
-  startTime: string; endTime: string; activityId: string
+  startTime: string; endTime: string; activityId: string; role?: string
 }) {
+  const role = opts.role || 'worker'
+  const intro = role === 'worker'
+    ? `Hi ${opts.carerName}, you've been assigned a new activity. Please review and accept or decline.`
+    : `Hi ${opts.carerName}, a Client has requested a new activity with no Worker assigned yet. Please review it — assign a Worker to accept it, or reject it.`
   const content = `
-    ${heading('New Activity Assigned')}
-    ${paragraph(`Hi ${opts.carerName}, you've been assigned a new activity. Please review and accept or decline.`)}
+    ${heading(role === 'worker' ? 'New Activity Assigned' : 'New Activity Requested')}
+    ${paragraph(intro)}
     ${detailsTable(
       detailRow('Activity', opts.activityTitle) +
       detailRow('Client', opts.clientName) +
       detailRow('Start', opts.startTime) +
       detailRow('End', opts.endTime)
     )}
-    ${button('View Activity', `${APP_URL}/worker/activities/${opts.activityId}`)}
+    ${button('View Activity', `${APP_URL}/${role}/activities/${opts.activityId}`)}
   `
-  return { subject: `New activity assigned: ${opts.activityTitle}`, html: wrapper(content, 'You have a new activity to review') }
+  return { subject: `New activity ${role === 'worker' ? 'assigned' : 'requested'}: ${opts.activityTitle}`, html: wrapper(content, 'You have a new activity to review') }
 }
 
 export function activityAcceptedEmail(opts: {

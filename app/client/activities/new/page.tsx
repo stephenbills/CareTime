@@ -32,6 +32,12 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString('en-AU', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
+  })
+}
+
 // Minutes from start to end, rolling over to the next day if end <= start
 function shiftDurationMinutes(startTimeStr: string, endTimeStr: string) {
   const [sh, sm] = startTimeStr.split(':').map(Number)
@@ -68,6 +74,7 @@ function ClientNewActivityInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [clientId, setClientId] = useState<string | null>(null)
+  const [clientName, setClientName] = useState('')
   const [providers, setProviders] = useState<{ id: string; name: string; email: string | null }[]>([])
   const [selectedProviderId, setSelectedProviderId] = useState<string>('')
   const [workers, setWorkers] = useState<any[]>([])
@@ -86,6 +93,7 @@ function ClientNewActivityInner() {
         .from('clients').select('*').eq('user_id', user.id).maybeSingle()
       if (!client) return
       setClientId(client.id)
+      setClientName(client.name || '')
 
       const addr = [client.address_line1, client.suburb, client.state, client.postcode]
         .filter(Boolean).join(', ')
@@ -122,7 +130,7 @@ function ClientNewActivityInner() {
       if (selectedProviderId) {
         const [{ data: workerLinks }, { data: ndis }] = await Promise.all([
           supabase.from('provider_carers')
-            .select('carer_id, carers(id, name)')
+            .select('carer_id, carers(id, name, email)')
             .eq('provider_id', selectedProviderId).eq('active', true),
           supabase.from('ndis_line_items').select('id, line_item_number, description')
             .eq('provider_id', selectedProviderId).eq('active', true),
@@ -134,7 +142,7 @@ function ClientNewActivityInner() {
       } else {
         // No linked Provider yet — fall back to an unscoped list rather than showing nothing
         const [{ data: wks }, { data: ndis }] = await Promise.all([
-          supabase.from('carers').select('id, name').eq('active', true).order('name'),
+          supabase.from('carers').select('id, name, email').eq('active', true).order('name'),
           supabase.from('ndis_line_items').select('id, line_item_number, description').eq('active', true),
         ])
         setWorkers(wks || [])
@@ -146,6 +154,7 @@ function ClientNewActivityInner() {
 
   const isRecurring = rruleStr !== null
   const selectedProvider = providers.find(p => p.id === selectedProviderId)
+  const selectedCarer = workers.find(w => w.id === carerId)
 
   function buildDateTime(dateStr: string, timeStr: string) {
     return new Date(`${dateStr}T${timeStr}:00`)
@@ -243,14 +252,21 @@ function ClientNewActivityInner() {
             await supabase.from('activity_medical_instructions').insert(rows)
           }
         }
-        if (providerEmail) {
-          notify('activity_changed', providerEmail, {
-            recipientName: providerName || 'Provider',
-            activityTitle: `${title} (recurring schedule)`,
-            changedBy: 'a Client',
-            activityId: created.id,
-            role: 'provider',
-          })
+        // Ask the nominated Worker to accept/decline; if none was chosen,
+        // ask the Provider to review and either assign a Worker or reject it.
+        const firstStart = buildDateTime(startDate, startTimeVal)
+        const firstEnd = new Date(firstStart.getTime() + durationMin * 60000)
+        const emailFields = {
+          activityTitle: `${title.trim()} (recurring schedule)`,
+          clientName: clientName || '—',
+          startTime: formatDateTime(firstStart.toISOString()),
+          endTime: formatDateTime(firstEnd.toISOString()),
+          activityId: created.id,
+        }
+        if (selectedCarer?.email) {
+          notify('activity_assigned', selectedCarer.email, { ...emailFields, carerName: selectedCarer.name })
+        } else if (providerEmail) {
+          notify('activity_assigned', providerEmail, { ...emailFields, carerName: providerName || 'Provider', role: 'provider' })
         }
       }
     } else {
@@ -282,14 +298,21 @@ function ClientNewActivityInner() {
         )
       }
 
-      if (created && providerEmail) {
-        notify('activity_changed', providerEmail, {
-          recipientName: providerName || 'Provider',
-          activityTitle: title,
-          changedBy: 'a Client',
+      if (created) {
+        // Ask the nominated Worker to accept/decline; if none was chosen,
+        // ask the Provider to review and either assign a Worker or reject it.
+        const emailFields = {
+          activityTitle: title.trim(),
+          clientName: clientName || '—',
+          startTime: formatDateTime(s.toISOString()),
+          endTime: formatDateTime(en.toISOString()),
           activityId: created.id,
-          role: 'provider',
-        })
+        }
+        if (selectedCarer?.email) {
+          notify('activity_assigned', selectedCarer.email, { ...emailFields, carerName: selectedCarer.name })
+        } else if (providerEmail) {
+          notify('activity_assigned', providerEmail, { ...emailFields, carerName: providerName || 'Provider', role: 'provider' })
+        }
       }
     }
 

@@ -4,6 +4,21 @@ All notable changes to CareTime are documented here.
 
 ---
 
+## Session 52 — 08 August 2026
+
+### Notify Worker (or Provider) to Accept/Reject When a Client Creates an Activity
+
+- When a Client created an activity or recurring schedule, the app always emailed the Provider a
+  generic "activity updated" notice — the nominated Worker (if any) was never emailed at all, so
+  they had no way to know a new shift needed their acceptance until they happened to check the app
+- `app/client/activities/new/page.tsx` now emails the nominated Worker (using the existing
+  `activity_assigned` "please accept or decline" template, same one used when a Provider assigns a
+  Worker directly) if a Worker was chosen; if none was chosen, it emails the Provider instead,
+  asking them to review the activity and either assign a Worker or reject it
+- `activityAssignedEmail` (`lib/email/templates.ts`) now takes an optional `role`, so the same
+  template renders correctly for either recipient (link and copy point at `/worker/activities/…`
+  or `/provider/activities/…` as appropriate) — existing Worker-facing callers are unaffected
+
 ## Session 51 — 08 August 2026
 
 ### Fix Recurring Shifts Landing on the Wrong Weekday + Add Save-Scope Prompt to Client Edit Activity
